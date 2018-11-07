@@ -1,0 +1,11 @@
+w5 w5 w5 w5 w5 w5 w5 w5 w5 w5 w5
+w5 k2 e1 g1 w0 b2 l0 w0 d0 X0 w5
+w5 w3 w3 w3 p0 e0 w1 w0 w1 w1 w5
+w5 r2 w2 w2 l0 w1 w1 w0 w0 b0 w5
+w5 d2 w3 m0 s0 l0 w1 w1 w1 l0 w5
+w5 y2 k0 l0 w1 l0 o0 w0 e0 y1 w5
+w5 w0 w0 w0 w0 l0 l0 w2 w2 w2 w5
+w5 w0 c2 s2 w0 p0 c0 s2 o0 r2 w5 
+w5 w0 w1 l0 w0 w0 w0 d0 w0 e2 w5
+w5 w0 g0 l0 w0 @0 w2 m0 s0 k3 w5
+w5 w5 w5 w5 w5 w5 w5 w5 w5 w5 w5
