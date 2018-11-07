@@ -1,7 +1,18 @@
 #include <GL/glut.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 
+/* Error-checking function. Used for technical C details */
+#define osAssert(condition, msg) osErrorFatal(condition, msg)
+void osErrorFatal(bool condition, const char* msg) {
+    if (!condition) {
+        perror(msg);
+        exit(EXIT_FAILURE);
+    }
+}
+
+/* Maximum input file names */
 #define MAX_FILE_NAME 32
 
 /* Structure that will keep data for every field cube. 
@@ -27,6 +38,9 @@ const static float CUBE_SIZE = 0.6;
 /* Camera position and look direction*/
 static float eye_x, eye_y, eye_z;
 static float to_x, to_y, to_z;
+
+/* Moving parameter */
+static float move_param = 0.02;
 
 /* Main game matrix that will store basic info about every game cube */
 static FieldData** map = NULL;
@@ -59,7 +73,7 @@ int main(int argc, char** argv)
     /* Material light parameters */
     GLfloat ambient_coeffs[] = {0.2, 0.2, 0.2, 1};
     GLfloat diffuse_coeffs[] = {0.2, 0.8, 0, 1};
-    GLfloat specular_coeffs[] = {0.1, 0.1, 0.1, 1};
+    GLfloat specular_coeffs[] = {0.3, 0.3, 0.3, 1};
     GLfloat shininess = 30;
 
     /* Basic GLUT initialization */
@@ -83,11 +97,13 @@ int main(int argc, char** argv)
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
 
+    /* Setting up light parameters */
     glLightfv(GL_LIGHT0, GL_POSITION, light_position);
     glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
     glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
 
+    /* Setting up material parameters */
     glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient_coeffs);
     glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse_coeffs);
     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular_coeffs);
@@ -119,10 +135,7 @@ static FieldData** allocate_map()
     int i;
 
     m = (FieldData**)malloc(map_rows * sizeof(FieldData*));
-    if (m == NULL) {
-        fprintf(stderr, "Allocating memory for map matrix failed.");
-        exit(EXIT_FAILURE);
-    }
+    osAssert(m != NULL, "Allocating memory for map matrix rows failed\n");
 
     for(i = 0; i < map_rows; i++) {
         m[i] = (FieldData*)malloc(map_cols * sizeof(FieldData));
@@ -133,7 +146,7 @@ static FieldData** allocate_map()
 
             free(m);
 
-            fprintf(stderr, "Allocating memory for map matrix columns failed.");
+            fprintf(stderr, "Allocating memory for one of map matrix columns failed.");
             exit(EXIT_FAILURE);
         }
     }
@@ -157,9 +170,13 @@ static void store_map_data()
     int i, j;
 
     f = fopen(map_input_file, "r");
+    osAssert(f != NULL, "Error opening file \"map.txt\"\n");
+
     for (i = 0; i < map_rows; i++) {
         for (j = 0; j < map_cols; j++) {
             fscanf(f, "%c%d ", &(*(map + i) + j)->type, &(*(map + i) + j)->height);
+            /* Connection coords are initially -1: they will be updated later */
+            map[i][j].x = map[i][j].y = map[i][j].z = -1;
         }
     }
 
@@ -171,13 +188,41 @@ static void create_map()
     int i, j;
 
     glPushMatrix();
-        glTranslatef(CUBE_SIZE / 2, CUBE_SIZE / 2, CUBE_SIZE / 2);
+        glTranslatef(CUBE_SIZE / 2, - CUBE_SIZE / 2, CUBE_SIZE / 2);
         for (i = 0; i < map_rows; i++) {
             for (j = 0; j < map_cols; j++) {
-                glPushMatrix();
-                    glTranslatef(j*CUBE_SIZE, 0, (map_rows - 1 - i)*CUBE_SIZE);
-                    glutSolidCube(CUBE_SIZE);
-                glPopMatrix();
+                switch (map[i][j].type) {
+                    case 'w':
+                        if (map[i][j].height == 0) {
+                            glPushMatrix();
+                                glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
+                                glColor3f(0.3, 0.8, 0.1);
+                                glutSolidCube(CUBE_SIZE);
+                            glPopMatrix();
+                        } else {
+                            glPushMatrix();
+                                glScalef(1, (map[i][j].height + 1) * CUBE_SIZE, 1);
+                                glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
+                                glColor3f(0.6, 0.6, 0.1);
+                                glutSolidCube(CUBE_SIZE);
+                            glPopMatrix();
+                        }
+                        break;
+                    case 'l':
+                        glPushMatrix();
+                            glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
+                            glColor3f(0.8, 0.2, 0.1);
+                            glutSolidCube(CUBE_SIZE);
+                        glPopMatrix();
+                        break;
+                    default:
+                        glPushMatrix();
+                            glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
+                            glColor3f(0.3, 0.8, 0.1);
+                            glutSolidCube(CUBE_SIZE);
+                        glPopMatrix();
+                        break;
+                }
             }
         }
     glPopMatrix();
@@ -193,6 +238,8 @@ static void initialize()
     to_z = 2;
 
     FILE* f = fopen(map_dimensions_file, "r");
+    osAssert(f != NULL, "Error opening file \"map_dimensions.txt\"\n");
+
     fscanf(f, "%d %d", &map_rows, &map_cols);
     fclose(f);
 
@@ -206,6 +253,26 @@ static void on_keyboard(unsigned char key, int x, int y)
         /* 'esc' exits the program */
         case 27:
             exit(0);
+            break;
+        case 'w':
+        case 'W':
+            eye_z += move_param;
+            glutPostRedisplay();
+            break;
+        case 's':
+        case 'S':
+            eye_z -= move_param;
+            glutPostRedisplay();
+            break;
+        case 'a':
+        case 'A':
+            eye_x -= move_param;
+            glutPostRedisplay();
+            break;
+        case 'd':
+        case 'D':
+            eye_x += move_param;
+            glutPostRedisplay();
             break;
     }
 }
