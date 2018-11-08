@@ -4,8 +4,8 @@
 #include <stdbool.h>
 
 /* Error-checking function. Used for technical C details */
-#define osAssert(condition, msg) osErrorFatal(condition, msg)
-void osErrorFatal(bool condition, const char* msg) {
+#define osAssert(condition, msg) osError(condition, msg)
+void osError(bool condition, const char* msg) {
     if (!condition) {
         perror(msg);
         exit(EXIT_FAILURE);
@@ -17,12 +17,18 @@ void osErrorFatal(bool condition, const char* msg) {
 
 /* Structure that will keep data for every field cube. 
  * 1) type can be: 'w' - wall, 'l' - lava, 't' - teleport, 'd' - door, 'e' - elevator,
- * 'k' - key, 's' - switch, 'X' - goal, '@' - player starting position
- * 2) x, y, z will store coordinates for teleport-teleport, key-door and
- * switch-elevator pairs that are connected */
+ *    'k' - key, 's' - switch, 'X' - goal, '@' - player starting position
+ * 2) color can be: 'r' - red, 'g' - green, 'b' - blue, 'y' - yellow, 'o' - orange,
+ *    'p' - purple, 'c' - cyan, 'm' - magenta, 'z' - brown, 'q' - grey (we want all
+ *     keys/doors to be brown and switches/elevators to be grey, to avoid too much colors)
+ * 3) to_row and to_col will store indexes in map matrix for teleport-teleport, 
+ *    key-door and switch/elevator that are connected
+ * switch-elevator pairs that are connected 
+ * 4) height stores height of the cube */
 typedef struct field {
     char type;
-    int x, y, z;
+    char color;
+    int to_row, to_col;
     int height;
 }   FieldData;
 
@@ -32,6 +38,8 @@ static int map_rows, map_cols;
 const static char map_input_file[MAX_FILE_NAME] = "map.txt";
 /* Map dimensions file */
 const static char map_dimensions_file[MAX_FILE_NAME] = "map_dimensions.txt";
+/* Map connections and teleport colors file */
+const static char map_connections_file[MAX_FILE_NAME] = "map_connections.txt";
 /* Every part of the field is made of cube of fixed size */
 const static float CUBE_SIZE = 0.6;
 
@@ -44,23 +52,28 @@ static float move_param = 0.02;
 
 /* Main game matrix that will store basic info about every game cube */
 static FieldData** map = NULL;
-/* Function that alocates space for map matrix */
-static FieldData** allocate_map();
-/* Function that frees dymanicly allocated space for map matrix */
-static FieldData** free_map();
-/* Function that stores cube types and their heights, pulled from a .txt file.
- * However, connections between cubes such as teleports still remain unchanged */
-static void store_map_data();
-/* Function that physically creates map in the game */
-static void create_map();
-
-/* Basic initializations */
-static void initialize();
 
 /*Basic glut callback functions declarations*/
 static void on_keyboard(unsigned char key, int x, int y);
 static void on_reshape(int width, int height);
 static void on_display(void);
+
+/* Function that alocates space for map matrix */
+static FieldData** allocate_map();
+/* Function that frees dymanicly allocated space for map matrix */
+static FieldData** free_map();
+/* Function that stores cube types and their heights, pulled from a .txt file. */
+static void store_map_data();
+/* Function that stores map field connections and teleport colors */
+static void store_map_connections();
+/* Function that physically creates map in the game */
+static void create_map();
+
+/* Basic GL/glut initialization */
+static void glut_initialize();
+
+/* Other initialization */
+static void initialize();
 
 int main(int argc, char** argv)
 {
@@ -91,6 +104,9 @@ int main(int argc, char** argv)
     glutDisplayFunc(on_display);
 
     /* Initializing basic clear color, depth test and initial var values */
+    glut_initialize();
+
+    /* Initializing map dimensions, camera parameters ... */
     initialize();
 
     /* Putting (directional) light on the scene */
@@ -111,7 +127,9 @@ int main(int argc, char** argv)
 
     map = allocate_map();
     store_map_data();
+    store_map_connections();
 
+    /*
     int i,j;
     for (i = 0; i < map_rows; i++) {
         for (j = 0; j < map_cols; j++)
@@ -121,130 +139,21 @@ int main(int argc, char** argv)
     
     printf("CUBE_SIZE: %f\n", CUBE_SIZE);
 
+
+    printf("\n------------------- Connections ---------------------\n");
+    for (i = 0; i < map_rows; i++) {
+        for (j = 0; j < map_cols; j++)
+            printf("[%d][%d]: (%c, %d, %d)\n", 
+                i, j, map[i][j].color, map[i][j].to_row, map[i][j].to_col);
+    }
+    */
+
     /* Entering OpenGL main loop */
     glutMainLoop();
 
     map = free_map(map);
 
     return 0;
-}
-
-static FieldData** allocate_map()
-{
-    FieldData** m = NULL;
-    int i;
-
-    m = (FieldData**)malloc(map_rows * sizeof(FieldData*));
-    osAssert(m != NULL, "Allocating memory for map matrix rows failed\n");
-
-    for(i = 0; i < map_rows; i++) {
-        m[i] = (FieldData*)malloc(map_cols * sizeof(FieldData));
-        if (m[i] == NULL) {
-            int j;
-            for (j = 0; j < i; j++)
-                free(m[j]);
-
-            free(m);
-
-            fprintf(stderr, "Allocating memory for one of map matrix columns failed.");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    return m;
-}
-
-static FieldData** free_map()
-{
-    int i;
-    for(i = 0; i < map_rows; i++)
-        free(map[i]);
-
-    free(map);
-    return NULL;
-}
-
-static void store_map_data()
-{
-    FILE* f = NULL;
-    int i, j;
-
-    f = fopen(map_input_file, "r");
-    osAssert(f != NULL, "Error opening file \"map.txt\"\n");
-
-    for (i = 0; i < map_rows; i++) {
-        for (j = 0; j < map_cols; j++) {
-            fscanf(f, "%c%d ", &(*(map + i) + j)->type, &(*(map + i) + j)->height);
-            /* Connection coords are initially -1: they will be updated later */
-            map[i][j].x = map[i][j].y = map[i][j].z = -1;
-        }
-    }
-
-    fclose(f);
-}
-
-static void create_map()
-{
-    int i, j;
-
-    glPushMatrix();
-        glTranslatef(CUBE_SIZE / 2, - CUBE_SIZE / 2, CUBE_SIZE / 2);
-        for (i = 0; i < map_rows; i++) {
-            for (j = 0; j < map_cols; j++) {
-                switch (map[i][j].type) {
-                    case 'w':
-                        if (map[i][j].height == 0) {
-                            glPushMatrix();
-                                glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
-                                glColor3f(0.3, 0.8, 0.1);
-                                glutSolidCube(CUBE_SIZE);
-                            glPopMatrix();
-                        } else {
-                            glPushMatrix();
-                                glScalef(1, (map[i][j].height + 1) * CUBE_SIZE, 1);
-                                glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
-                                glColor3f(0.6, 0.6, 0.1);
-                                glutSolidCube(CUBE_SIZE);
-                            glPopMatrix();
-                        }
-                        break;
-                    case 'l':
-                        glPushMatrix();
-                            glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
-                            glColor3f(0.8, 0.2, 0.1);
-                            glutSolidCube(CUBE_SIZE);
-                        glPopMatrix();
-                        break;
-                    default:
-                        glPushMatrix();
-                            glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
-                            glColor3f(0.3, 0.8, 0.1);
-                            glutSolidCube(CUBE_SIZE);
-                        glPopMatrix();
-                        break;
-                }
-            }
-        }
-    glPopMatrix();
-}
-
-static void initialize()
-{   
-    eye_x = 0;
-    eye_y = 5;
-    eye_z = 0;
-    to_x = 2;
-    to_y = 2;
-    to_z = 2;
-
-    FILE* f = fopen(map_dimensions_file, "r");
-    osAssert(f != NULL, "Error opening file \"map_dimensions.txt\"\n");
-
-    fscanf(f, "%d %d", &map_rows, &map_cols);
-    fclose(f);
-
-    glClearColor(0.7, 0.7, 0.7, 0);
-    glEnable(GL_DEPTH_TEST);
 }
 
 static void on_keyboard(unsigned char key, int x, int y)
@@ -305,3 +214,152 @@ static void on_display(void)
 
     glutSwapBuffers();
 }
+
+static void glut_initialize()
+{   
+    glClearColor(0.7, 0.7, 0.7, 0);
+    glEnable(GL_DEPTH_TEST);
+}
+
+static void initialize()
+{
+    eye_x = 0;
+    eye_y = 5;
+    eye_z = 0;
+    to_x = 2;
+    to_y = 2;
+    to_z = 2;
+
+    FILE* f = fopen(map_dimensions_file, "r");
+    osAssert(f != NULL, "Error opening file \"map_dimensions.txt\"\n");
+
+    fscanf(f, "%d %d", &map_rows, &map_cols);
+    fclose(f);
+}
+
+static FieldData** allocate_map()
+{
+    FieldData** m = NULL;
+    int i;
+
+    m = (FieldData**)malloc(map_rows * sizeof(FieldData*));
+    osAssert(m != NULL, "Allocating memory for map matrix rows failed\n");
+
+    for(i = 0; i < map_rows; i++) {
+        m[i] = (FieldData*)malloc(map_cols * sizeof(FieldData));
+        if (m[i] == NULL) {
+            int j;
+            for (j = 0; j < i; j++)
+                free(m[j]);
+
+            free(m);
+
+            fprintf(stderr, "Allocating memory for one of map matrix columns failed.");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    return m;
+}
+
+static FieldData** free_map()
+{
+    int i;
+    for(i = 0; i < map_rows; i++)
+        free(map[i]);
+
+    free(map);
+    return NULL;
+}
+
+static void store_map_data()
+{
+    FILE* f = NULL;
+    int i, j;
+
+    f = fopen(map_input_file, "r");
+    osAssert(f != NULL, "Error opening file \"map.txt\"\n");
+
+    for (i = 0; i < map_rows; i++) {
+        for (j = 0; j < map_cols; j++) {
+            fscanf(f, "%c%d ", &(*(map + i) + j)->type, &(*(map + i) + j)->height);
+            /* Connection coords are initially -1: they will be updated later */
+            map[i][j].to_row = map[i][j].to_col = -1;
+            /* Color is initially 'u' - unsigned */
+            map[i][j].color = 'u';
+        }
+    }
+
+    fclose(f);
+}
+
+static void store_map_connections()
+{
+    FILE* f = NULL;
+    int n, row1, row2, col1, col2, i;
+    char c;
+
+    f = fopen(map_connections_file, "r");
+    osAssert(f != NULL, "Error opening file \"map_connections.txt\"\n");
+
+    fscanf(f, "%d", &n);
+    fgetc(f);
+    for (i = 0; i < n; i++) {
+        fscanf(f, "%c %d %d %d %d ", &c, &row1, &col1, &row2, &col2);
+        map[row1][col1].color = c;
+        map[row1][col1].to_row = row2;
+        map[row1][col1].to_col = col2;
+        /* And also backwards! */
+        map[row2][col2].color = c;
+        map[row2][col2].to_row = row1;
+        map[row2][col2].to_col = col1;
+    }
+
+    fclose(f);
+}
+
+static void create_map()
+{
+    int i, j;
+
+    glPushMatrix();
+        glTranslatef(CUBE_SIZE / 2, - CUBE_SIZE / 2, CUBE_SIZE / 2);
+        for (i = 0; i < map_rows; i++) {
+            for (j = 0; j < map_cols; j++) {
+                switch (map[i][j].type) {
+                    case 'w':
+                        if (map[i][j].height == 0) {
+                            glPushMatrix();
+                                glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
+                                glColor3f(0.3, 0.8, 0.1);
+                                glutSolidCube(CUBE_SIZE);
+                            glPopMatrix();
+                        } else {
+                            glPushMatrix();
+                                glScalef(1, (map[i][j].height + 1) * CUBE_SIZE, 1);
+                                glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
+                                glColor3f(0.6, 0.6, 0.1);
+                                glutSolidCube(CUBE_SIZE);
+                            glPopMatrix();
+                        }
+                        break;
+                    case 'l':
+                        glPushMatrix();
+                            glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
+                            glColor3f(0.8, 0.2, 0.1);
+                            glutSolidCube(CUBE_SIZE);
+                        glPopMatrix();
+                        break;
+                    default:
+                        glPushMatrix();
+                            glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
+                            glColor3f(0.3, 0.8, 0.1);
+                            glutSolidCube(CUBE_SIZE);
+                        glPopMatrix();
+                        break;
+                }
+            }
+        }
+    glPopMatrix();
+}
+
