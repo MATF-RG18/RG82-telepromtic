@@ -136,25 +136,6 @@ int main(int argc, char** argv)
     store_map_data();
     store_map_connections();
 
-    /*
-    int i,j;
-    for (i = 0; i < map_rows; i++) {
-        for (j = 0; j < map_cols; j++)
-            printf("%c%d ", map[i][j].type, map[i][j].height);
-        putchar('\n');
-    }
-    
-    printf("CUBE_SIZE: %f\n", CUBE_SIZE);
-
-
-    printf("\n------------------- Connections ---------------------\n");
-    for (i = 0; i < map_rows; i++) {
-        for (j = 0; j < map_cols; j++)
-            printf("[%d][%d]: (%c, %d, %d)\n", 
-                i, j, map[i][j].color, map[i][j].to_row, map[i][j].to_col);
-    }
-    */
-
     /* Entering OpenGL main loop */
     glutMainLoop();
 
