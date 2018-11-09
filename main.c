@@ -45,12 +45,16 @@ const static char map_connections_file[MAX_FILE_NAME] = "map_connections.txt";
 /* Every part of the field is made of cube of fixed size */
 const static float CUBE_SIZE = 0.6;
 
-/* Camera position and look direction*/
+/* Camera position, look direction and normalvector*/
 static float eye_x, eye_y, eye_z;
 static float to_x, to_y, to_z;
+static float n_x, n_y, n_z;
 
 /* Moving parameter */
 static float move_param = 0.02;
+
+/* Material component coeffs that will be updated by support function */
+GLfloat coeffs[] = {0, 0, 0, 1};
 
 /* Main game matrix that will store basic info about every game cube */
 static FieldData** map = NULL;
@@ -77,6 +81,9 @@ static void glut_initialize();
 /* Other initialization */
 static void initialize();
 
+/* Support functions that returns vector of coefficients */
+static void set_coeffs(float r, float g, float b, float a);
+
 int main(int argc, char** argv)
 {
     /* Light parameters */
@@ -85,9 +92,9 @@ int main(int argc, char** argv)
     GLfloat light_diffuse[] = {0.7, 0.7, 0.7, 1};
     GLfloat light_specular[] = {0.9, 0.9, 0.9, 1};
 
-    /* Material light parameters */
+    /* Material lighting parameters */
     GLfloat ambient_coeffs[] = {0.2, 0.2, 0.2, 1};
-    GLfloat diffuse_coeffs[] = {0.2, 0.8, 0, 1};
+    GLfloat diffuse_coeffs[] = {0.5, 0.5, 0.5, 1};
     GLfloat specular_coeffs[] = {0.3, 0.3, 0.3, 1};
     GLfloat shininess = 30;
 
@@ -96,7 +103,7 @@ int main(int argc, char** argv)
     glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
 
     /* Window settings */
-    glutInitWindowSize(600, 600);
+    glutInitWindowSize(800, 600);
     glutInitWindowPosition(100, 100);
     glutCreateWindow(argv[0]);
 
@@ -121,12 +128,13 @@ int main(int argc, char** argv)
     glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
     glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
 
-    /* Setting up material parameters */
+    /* Setting up default material parameters */
     glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient_coeffs);
     glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse_coeffs);
     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular_coeffs);
     glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
 
+    /* Storing map data */
     map = allocate_map();
     store_map_data();
     store_map_connections();
@@ -210,7 +218,7 @@ static void on_display(void)
 
     gluLookAt(eye_x, eye_y, eye_z,
               to_x, to_y, to_z,
-              0, 1, 0);
+              n_x, n_y, n_z);
 
     create_map();
 
@@ -225,12 +233,15 @@ static void glut_initialize()
 
 static void initialize()
 {
-    eye_x = 0;
-    eye_y = 5;
+    eye_x = 0*CUBE_SIZE;
+    eye_y = 8*CUBE_SIZE;
     eye_z = 0;
-    to_x = 2;
-    to_y = 2;
-    to_z = 2;
+    to_x = 5*CUBE_SIZE;
+    to_y = 2*CUBE_SIZE;
+    to_z = -5*CUBE_SIZE;
+    n_x = 0;
+    n_y = 1;
+    n_z = 0;
 
     FILE* f = fopen(map_dimensions_file, "r");
     osAssert(f != NULL, "Error opening file \"map_dimensions.txt\"\n");
@@ -325,37 +336,41 @@ static void create_map()
     int i, j;
 
     glPushMatrix();
-        glTranslatef(CUBE_SIZE / 2, - CUBE_SIZE / 2, CUBE_SIZE / 2);
-        for (i = 0; i < map_rows; i++) {
+        glTranslatef(CUBE_SIZE / 2, - CUBE_SIZE / 2, - CUBE_SIZE / 2);
+        for (i = map_rows - 1; i >= 0; i--) {
             for (j = 0; j < map_cols; j++) {
                 switch (map[i][j].type) {
                     case 'w':
                         if (map[i][j].height == 0) {
                             glPushMatrix();
-                                glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
-                                glColor3f(0.3, 0.8, 0.1);
+                                glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
+                                set_coeffs(0.2, 1, 0.1, 1);
+                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                                 glutSolidCube(CUBE_SIZE);
                             glPopMatrix();
                         } else {
                             glPushMatrix();
                                 glScalef(1, (map[i][j].height + 1) * CUBE_SIZE, 1);
-                                glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
-                                glColor3f(0.6, 0.6, 0.1);
+                                glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
+                                set_coeffs(0.5, 0.5, 0.1, 1);
+                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                                 glutSolidCube(CUBE_SIZE);
                             glPopMatrix();
                         }
                         break;
                     case 'l':
                         glPushMatrix();
-                            glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
-                            glColor3f(0.8, 0.2, 0.1);
+                            glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
+                            set_coeffs(0.9, 0.2, 0.1, 1);
+                            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
                         glPopMatrix();
                         break;
                     default:
                         glPushMatrix();
-                            glTranslatef(j*CUBE_SIZE, 0, i*CUBE_SIZE);
-                            glColor3f(0.3, 0.8, 0.1);
+                            glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
+                            set_coeffs(0.2, 1, 0.1, 1);
+                            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
                         glPopMatrix();
                         break;
@@ -365,3 +380,10 @@ static void create_map()
     glPopMatrix();
 }
 
+static void set_coeffs(float r, float g, float b, float a)
+{
+    coeffs[0] = a;
+    coeffs[1] = g;
+    coeffs[2] = b;
+    coeffs[3] = a;
+}
