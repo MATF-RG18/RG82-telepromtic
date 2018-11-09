@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+/* TODO: OBAVEZNO MERGOVATI coord_movent u master jer je odlicno odradjen! :) */
+
 /* Error-checking function. Used for technical C details */
 #define osAssert(condition, msg) osError(condition, msg)
 void osError(bool condition, const char* msg) {
