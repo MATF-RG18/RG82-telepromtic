@@ -3,8 +3,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-/* TODO: OBAVEZNO MERGOVATI coord_movent u master jer je odlicno odradjen! :) */
-
 /* Error-checking function. Used for technical C details */
 #define osAssert(condition, msg) osError(condition, msg)
 void osError(bool condition, const char* msg) {
@@ -25,7 +23,6 @@ void osError(bool condition, const char* msg) {
  *     keys/doors to be brown and switches/elevators to be grey, to avoid too much colors)
  * 3) to_row and to_col will store indexes in map matrix for teleport-teleport, 
  *    key-door and switch/elevator that are connected
- * switch-elevator pairs that are connected 
  * 4) height stores height of the cube */
 typedef struct field {
     char type;
@@ -45,7 +42,7 @@ const static char map_connections_file[MAX_FILE_NAME] = "map_connections.txt";
 /* Every part of the field is made of cube of fixed size */
 const static float CUBE_SIZE = 0.6;
 
-/* Camera position, look direction and normalvector*/
+/* Camera position, look direction and normal vector*/
 static float eye_x, eye_y, eye_z;
 static float to_x, to_y, to_z;
 static float n_x, n_y, n_z;
@@ -352,7 +349,7 @@ static void create_map()
                             glPushMatrix();
                                 glScalef(1, (map[i][j].height + 1) * CUBE_SIZE, 1);
                                 glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
-                                set_coeffs(0.5, 0.5, 0.1, 1);
+                                set_coeffs(0.5, 0.6, 0.1, 1);
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                                 glutSolidCube(CUBE_SIZE);
                             glPopMatrix();
