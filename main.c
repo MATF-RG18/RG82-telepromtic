@@ -23,7 +23,7 @@ void osError(bool condition, const char* msg) {
  *     keys/doors to be brown and switches/elevators to be grey, to avoid too much colors)
  * 3) to_row and to_col will store indexes in map matrix for teleport-teleport, 
  *    key-door and switch/elevator that are connected
- * 4) height stores height of the cube */
+ * 4) height stores height of the cube: 0 height means floor */
 typedef struct field {
     char type;
     char color;
@@ -78,8 +78,11 @@ static void glut_initialize();
 /* Other initialization */
 static void initialize();
 
-/* Support functions that returns vector of coefficients */
+/* Support function that sets coeffs in a global vector */
 static void set_coeffs(float r, float g, float b, float a);
+
+/* Support function that resets default material lighting settings */
+static void reset_material();
 
 int main(int argc, char** argv)
 {
@@ -364,4 +367,17 @@ static void set_coeffs(float r, float g, float b, float a)
     coeffs[1] = g;
     coeffs[2] = b;
     coeffs[3] = a;
+}
+
+static void reset_material()
+{
+    GLfloat ambient_coeffs[] = {0.2, 0.2, 0.2, 1};
+    GLfloat diffuse_coeffs[] = {0.5, 0.5, 0.5, 1};
+    GLfloat specular_coeffs[] = {0.3, 0.3, 0.3, 1};
+    GLfloat shininess = 30;
+
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient_coeffs);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse_coeffs);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular_coeffs);
+    glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
 }
