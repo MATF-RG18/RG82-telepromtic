@@ -331,7 +331,7 @@ static void create_map()
                             glPopMatrix();
                         } else {
                             glPushMatrix();
-                                glScalef(1, map[i][j].height + 1, 1);
+                                glScalef(1, (map[i][j].height + 1), 1);
                                 glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
                                 set_coeffs(0.8, 0.8, 0.2, 1);
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
