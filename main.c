@@ -335,7 +335,7 @@ static void create_map()
                             glTranslatef(0, CUBE_SIZE, 0);
                             glScalef(1, map[i][j].height, 1);
                             /* set_coeffs(0.6, 0.25, 0.1, 0.4); */
-                            set_coeffs(0.8, 0.5, 0.2, 0.6);                            
+                            set_coeffs(1, 1, 1, 0.6);                            
                             glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
                         }
