@@ -82,7 +82,7 @@ static void initialize();
 static void set_coeffs(float r, float g, float b, float a);
 
 /* Support function that resets default material lighting settings */
-/* static void reset_material(); */
+static void reset_material(); 
 
 int main(int argc, char** argv)
 {
@@ -327,7 +327,7 @@ static void create_map()
                     case 'w':
                         glPushMatrix();
                             glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
-                            set_coeffs(0.2, 1, 0.1, 1);
+                            set_coeffs(0.2, 0.7, 0.1, 1);
                             glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
 
@@ -335,11 +335,12 @@ static void create_map()
                             glTranslatef(0, CUBE_SIZE, 0);
                             glScalef(1, map[i][j].height, 1);
                             /* set_coeffs(0.6, 0.25, 0.1, 0.4); */
-                            set_coeffs(1, 1, 1, 0.6);                            
+                            set_coeffs(0.7, 0.5, 0.2, 1);                           
                             glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
                         }
                         glPopMatrix();
+                        reset_material();
                         break;
                     case 'l':
                         glPushMatrix();
@@ -348,11 +349,13 @@ static void create_map()
                             glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
                         glPopMatrix();
+
+                        reset_material();
                         break;
                     case 'd':
                         glPushMatrix();
                             glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
-                            set_coeffs(0.2, 1, 0.1, 1);
+                            set_coeffs(0.2, 0.7, 0.1, 1);
                             glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
                         glPopMatrix();
@@ -360,7 +363,7 @@ static void create_map()
                         if (map[i][j].height == 0) {
                             glPushMatrix();
                                 glTranslatef(j*CUBE_SIZE, CUBE_SIZE, -(map_rows - 1 - i)*CUBE_SIZE);
-                                set_coeffs(0.5, 0.6, 0.1, 1);
+                                set_coeffs(0.5, 0.2, 0.1, 1);
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                                 glutSolidCube(CUBE_SIZE);
                             glPopMatrix();
@@ -375,15 +378,18 @@ static void create_map()
 
                             glPushMatrix();
                                 glTranslatef(j*CUBE_SIZE, map[i][j].height * CUBE_SIZE, -(map_rows - 1 - i)*CUBE_SIZE);
-                                set_coeffs(0.5, 0.6, 0.1, 1);
+                                set_coeffs(0.5, 0.2, 0.1, 1);
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                                 glutSolidCube(CUBE_SIZE);
                             glPopMatrix();
                         }
+
+                        reset_material();
+                        break;
                     case 'e':
                         glPushMatrix();
                             glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
-                            set_coeffs(0.2, 1, 0.1, 1);
+                            set_coeffs(0.2, 0.7, 0.1, 1);
                             glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
                         glPopMatrix();
@@ -400,7 +406,7 @@ static void create_map()
                             glPushMatrix();
                                 glTranslatef(j*CUBE_SIZE, CUBE_SIZE, -(map_rows - 1 - i)*CUBE_SIZE);
                                 glScalef(1, map[i][j].height, 1);
-                                set_coeffs(0.8, 0.5, 0.2, 0.6);                                
+                                set_coeffs(0.7, 0.5, 0.2, 1);                               
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                                 glutSolidCube(CUBE_SIZE);
                             glPopMatrix();
@@ -413,10 +419,83 @@ static void create_map()
                                 glutSolidCube(CUBE_SIZE);
                             glPopMatrix();
                         }
+
+                        reset_material();
+                        break;
+                    case 'k':
+                        glPushMatrix();
+                            glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
+                            set_coeffs(0.2, 0.7, 0.1, 1);
+                            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                            glutSolidCube(CUBE_SIZE);
+                        glPopMatrix();
+
+                        if (map[i][j].height == 0) {
+                            glPushMatrix();
+                                glTranslatef(j*CUBE_SIZE, CUBE_SIZE, -(map_rows - 1 - i)*CUBE_SIZE);
+                                set_coeffs(0.8, 0.8, 0.1, 0.9);
+                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                                glutSolidSphere(0.1, 15, 15);
+                                /* glutSolidCube(CUBE_SIZE/3); */
+                            glPopMatrix();
+                        } else {
+                            glPushMatrix();
+                                glTranslatef(j*CUBE_SIZE, CUBE_SIZE, -(map_rows - 1 - i)*CUBE_SIZE);
+                                glScalef(1, map[i][j].height, 1);
+                                set_coeffs(0.7, 0.5, 0.2, 1);                               
+                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                                glutSolidCube(CUBE_SIZE);
+                            glPopMatrix();
+
+                            glPushMatrix();
+                                glTranslatef(j*CUBE_SIZE, map[i][j].height * CUBE_SIZE, -(map_rows - 1 - i)*CUBE_SIZE);
+                                set_coeffs(0.8, 0.8, 0.1, 0.9);
+                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                                glutSolidSphere(0.1, 15, 15);
+                                /* glutSolidCube(CUBE_SIZE/3); */
+                            glPopMatrix();
+                        }
+
+                        reset_material();
+                        break;
+                    case 's':
+                        glPushMatrix();
+                            glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
+                            set_coeffs(0.2, 0.7, 0.1, 1);
+                            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                            glutSolidCube(CUBE_SIZE);
+                        glPopMatrix();
+
+                        if (map[i][j].height == 0) {
+                            glPushMatrix();
+                                glTranslatef(j*CUBE_SIZE, CUBE_SIZE, -(map_rows - 1 - i)*CUBE_SIZE);
+                                set_coeffs(0.2, 0.2, 0.4, 1);
+                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                                glutSolidCube(CUBE_SIZE/3);
+                            glPopMatrix();
+                        } else {
+                            glPushMatrix();
+                                glTranslatef(j*CUBE_SIZE, CUBE_SIZE, -(map_rows - 1 - i)*CUBE_SIZE);
+                                glScalef(1, map[i][j].height, 1);
+                                set_coeffs(0.7, 0.5, 0.2, 1);                               
+                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                                glutSolidCube(CUBE_SIZE);
+                            glPopMatrix();
+
+                            glPushMatrix();
+                                glTranslatef(j*CUBE_SIZE, map[i][j].height * CUBE_SIZE, -(map_rows - 1 - i)*CUBE_SIZE);
+                                set_coeffs(0.2, 0.2, 0.4, 1);
+                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                                glutSolidCube(CUBE_SIZE/3);
+                            glPopMatrix();
+                        }
+
+                        reset_material();
+                        break;
                     default:
                         glPushMatrix();
                             glTranslatef(j*CUBE_SIZE, 0, -(map_rows - 1 - i)*CUBE_SIZE);
-                            set_coeffs(0.2, 1, 0.1, 1);
+                            set_coeffs(0.2, 0.7, 0.1, 1);
                             glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
 
@@ -427,6 +506,7 @@ static void create_map()
                             glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
                         }
+
                         glPopMatrix();
                         break;
                 }
@@ -440,13 +520,13 @@ static void create_map()
 
 static void set_coeffs(float r, float g, float b, float a)
 {
-    coeffs[0] = a;
+    coeffs[0] = r;
     coeffs[1] = g;
     coeffs[2] = b;
     coeffs[3] = a;
 }
 
-/*
+
 static void reset_material()
 {
     GLfloat ambient_coeffs[] = {0.2, 0.2, 0.2, 1};
@@ -458,4 +538,3 @@ static void reset_material()
     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular_coeffs);
     glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
 }
-*/

@@ -1,0 +1,6 @@
+w1 w1 w1 w1 w1 w1 w1
+@1 w1 w1 w1 w1 w1 b1
+w1 w1 w1 w1 w1 w1 w1
+w2 w2 w2 w2 w2 w2 w2
+w2 w2 w2 w2 w2 w2 x2
+w2 w2 w2 w2 w2 w2 w2
