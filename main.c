@@ -531,20 +531,36 @@ static void create_map()
                             set_coeffs(0.2, 0.7, 0.1, 1);
                             glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
+                        glPopMatrix();
 
                         if (map[i][j].height == 0) {
-                            create_teleport(-CUBE_SIZE/2, CUBE_SIZE/2 + EPS, CUBE_SIZE/2, map[i][j].color);
+                            glPushMatrix();
+                                glTranslatef(x, 0, z);
+                                create_teleport(-CUBE_SIZE/2, CUBE_SIZE/2 + EPS, CUBE_SIZE/2, map[i][j].color);
+                            glPopMatrix();
+                        } else if (map[i][j].height == 1) {
+                            glPushMatrix();
+                                glTranslatef(x, CUBE_SIZE, z);
+                                set_coeffs(0.7, 0.5, 0.2, 1);                           
+                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                                glutSolidCube(CUBE_SIZE);
+                                create_teleport(-CUBE_SIZE/2, CUBE_SIZE/2 + EPS, CUBE_SIZE/2, map[i][j].color);
+                            glPopMatrix();
                         } else {
-                            glTranslatef(0, CUBE_SIZE, 0);
+                            glPushMatrix();
+                                glTranslatef(x, CUBE_SIZE, z);
                                 glScalef(1, map[i][j].height, 1);
                                 set_coeffs(0.7, 0.5, 0.2, 1);                           
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                                 glutSolidCube(CUBE_SIZE);
+                            glPopMatrix();
 
-                                create_teleport(-CUBE_SIZE/2, CUBE_SIZE/2 + EPS, CUBE_SIZE/2, map[i][j].color);
+                            glPushMatrix();
+                                glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
+                                create_teleport(-CUBE_SIZE/2, EPS, CUBE_SIZE/2, map[i][j].color);
+                            glPopMatrix();
                         }
 
-                        glPopMatrix();
                         break;
                 }
             }
