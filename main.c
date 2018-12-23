@@ -5,6 +5,12 @@
 #include <math.h>
 #include <time.h>
 
+#define MAX_FILE_NAME 32
+#define PI 3.14159265359
+#define EPS 0.01
+#define RAD_TO_DEG 180/PI
+#define DEG_TO_RAD PI/180
+
 /* Error-checking function. Used for technical C details */
 #define osAssert(condition, msg) osError(condition, msg)
 void osError(bool condition, const char* msg) {
@@ -14,9 +20,7 @@ void osError(bool condition, const char* msg) {
     }
 }
 
-#define MAX_FILE_NAME 32
-#define PI 3.14159265359
-#define EPS 0.01
+
 /* #define TELEPORT_TIMER_ID 1 */
 
 /* Structure that will keep data for every field cube. 
@@ -96,9 +100,15 @@ static void set_coeffs(float r, float g, float b, float a);
 /* Support function that draws coordinate system */
 static void draw_axis();
 
+/* Creates wall with h height */
+static void creat_wall(float h);
+
 /* Support functions that draw cylinder */
 static void set_norm_vert_cylinder(float r, float phi, float h);
 static void draw_cylinder(float r, float h);
+
+/* Creates keys on the map */
+static void create_key();
 
 /* Creates teleport with the given color */
 static void create_teleport(float x, float y, float z, char color);
@@ -199,6 +209,14 @@ static void on_keyboard(unsigned char key, int x, int y)
             eye_x += move_param;
             glutPostRedisplay();
             break;
+
+        case 'r':
+        case 'R':
+            eye_x = 0;
+            eye_y = 8*CUBE_SIZE;
+            eye_z = 0;
+            glutPostRedisplay();
+            break;
     }
 }
 
@@ -241,7 +259,7 @@ static void glut_initialize()
 
 static void other_initialize()
 {
-    eye_x = 0*CUBE_SIZE;
+    eye_x = 0;
     eye_y = 8*CUBE_SIZE;
     eye_z = 0;
     to_x = 5*CUBE_SIZE;
@@ -339,6 +357,146 @@ static void store_map_connections()
     }
 
     fclose(f);
+}
+
+static void set_coeffs(float r, float g, float b, float a)
+{
+    coeffs[0] = r;
+    coeffs[1] = g;
+    coeffs[2] = b;
+    coeffs[3] = a;
+}
+
+static void draw_axis()
+{
+    glDisable(GL_LIGHTING);
+
+    glBegin(GL_LINES);
+        glColor3f(1, 0, 0);
+        glVertex3f(0, 0, 0);
+        glVertex3f(15*CUBE_SIZE, 0, 0);
+
+        glColor3f(0, 1, 0);
+        glVertex3f(0, 0, 0);
+        glVertex3f(0, 15*CUBE_SIZE, 0);
+
+        glColor3f(0, 0, 1);
+        glVertex3f(0, 0, 0);
+        glVertex3f(0, 0, -15*CUBE_SIZE);
+    glEnd();
+
+    glEnable(GL_LIGHTING);
+}
+
+static void set_norm_vert_cylinder(float r, float phi, float h)
+{
+    glNormal3f(r*sin(phi), h, r*cos(phi));
+    glVertex3f(r*sin(phi), h, r*cos(phi));
+}
+
+static void draw_cylinder(float r, float h)
+{
+    float phi;
+
+    glBegin(GL_TRIANGLE_STRIP);
+    for (phi = 0; phi <= 2*PI + EPS; phi += PI/20) {
+        set_norm_vert_cylinder(r, phi, 0);
+        set_norm_vert_cylinder(r, phi, h);
+    }
+    glEnd();
+}
+
+static void create_key()
+{
+    float body_radius = 0.015;
+    float body_height = 0.2;
+
+    /* Key torus part */
+    glPushMatrix();
+        glTranslatef(0.04, 0, 0);
+        glutSolidTorus(0.015, 0.05, 10, 20);
+    glPopMatrix();
+
+    /* Key body */
+    glPushMatrix();
+        glRotatef(90, 0, 0, 1);
+        draw_cylinder(body_radius, body_height);
+    glPopMatrix();
+
+    /* "Teeth" */
+    glPushMatrix();
+        glTranslatef(-0.16, -0.1, 0);
+        draw_cylinder(body_radius/1.5, body_height/3);
+
+        glTranslatef(0.05, 0, 0);
+        draw_cylinder(body_radius/1.5, body_height/3);
+    glPopMatrix();
+}
+
+static void create_teleport(float x, float y, float z, char color)
+{
+    /* Reminder: (x,y,z) are the coordinates of the center of the cube */
+    float phi;
+    float r = CUBE_SIZE / 2 - 0.05;
+    float interval_01;
+
+    /* Teleport lines height will be in [a, b] interval */
+    float a = 0.3, b = CUBE_SIZE;
+
+    switch (color) {
+        case 'b':   set_coeffs(0, 0, 1, 0.8); break;
+        case 'r':   set_coeffs(0.9, 0.1, 0.1, 0.8); break;
+        case 'g':   set_coeffs(0, 0.55, 0, 0.8); break;
+        case 'y':   set_coeffs(1, 0.85, 0, 0.8); break;
+        case 'o':   set_coeffs(1, 0.55, 0, 0.8); break;
+        case 'm':   set_coeffs(1, 0.4, 0.75, 0.8); break;
+        case 'p':   set_coeffs(0.3, 0, 0.6, 0.8); break;
+        case 'c':   set_coeffs(0, 0.75, 1, 0.8); break;
+        default:    set_coeffs(1, 1, 1, 0.8); break;
+    }
+
+    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+
+    /* glutTimerFunc(10, on_timer, TELEPORT_TIMER_ID); */
+
+    /* Teleport outer circle: has slightly lower alpha (is transparent) */
+    glBegin(GL_TRIANGLE_FAN);
+
+        glNormal3f(0, 1, 0);
+        glVertex3f(x, y, z);
+
+        for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
+            glVertex3f(x + r * cos(phi), y, z + r * sin(phi));
+        }
+    glEnd();
+
+    /* Teleport inner circle */
+    coeffs[3] = 0.9;
+    glBegin(GL_TRIANGLE_FAN);
+
+        glNormal3f(0, 1, 0);
+        glVertex3f(x, y + EPS/2, z);
+
+        for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
+            glVertex3f(x + r/1.5 * cos(phi), y + EPS/2, z + r/1.5 * sin(phi));
+        }
+    glEnd();
+
+    coeffs[3] = 0.8;
+
+    glLineWidth(1.8);
+    for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
+        interval_01 = rand() / (float) RAND_MAX;
+
+        glBegin(GL_LINES);
+            glVertex3f(x  + r * cos(phi * 1.2 /* + teleport_time */), 
+                       y, 
+                       z + r * sin(phi * 1.2 /* + teleport_time */));
+            glVertex3f(x + r * cos(phi * 1.2 /* + teleport_time */), 
+                       y + (interval_01 * (b-a) + a), 
+                       z + r * sin(phi * 1.2 /* + teleport_time */));
+        glEnd();        
+    }
 }
 
 static void create_map()
@@ -471,11 +629,10 @@ static void create_map()
 
                         if (map[i][j].height == 0) {
                             glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE, z);
-                                set_coeffs(0.8, 0.8, 0.1, 0.9);
+                                glTranslatef(x, CUBE_SIZE + 5*EPS, z);
+                                set_coeffs(0.8, 0.8, 0, 1);
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidSphere(0.1, 15, 15);
-                                /* glutSolidCube(CUBE_SIZE/3); */
+                                create_key();
                             glPopMatrix();
                         } else {
                             glPushMatrix();
@@ -487,11 +644,10 @@ static void create_map()
                             glPopMatrix();
 
                             glPushMatrix();
-                                glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
-                                set_coeffs(0.8, 0.8, 0.1, 0.9);
+                                glTranslatef(x, map[i][j].height * CUBE_SIZE + 5*EPS, z);
+                                set_coeffs(0.8, 0.8, 0, 1);
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidSphere(0.1, 15, 15);
-                                /* glutSolidCube(CUBE_SIZE/3); */
+                                create_key();
                             glPopMatrix();
                         }
 
@@ -512,7 +668,7 @@ static void create_map()
                                 set_coeffs(0.5, 0.5, 0.7, 1);
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                                 glRotatef(30, 0, 0, 1);
-                                draw_cylinder(0.05, switch_height);
+                                draw_cylinder(0.035, switch_height);
                             glPopMatrix();
                         } else {
                             glPushMatrix();
@@ -528,7 +684,7 @@ static void create_map()
                                 set_coeffs(0.5, 0.5, 0.7, 1);
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                                 glRotatef(-30, 0, 0, 1);
-                                draw_cylinder(0.05, switch_height);
+                                draw_cylinder(0.035, switch_height);
                             glPopMatrix();
                         }
 
@@ -579,121 +735,6 @@ static void create_map()
     glPopMatrix();
 
 }
-
-static void set_coeffs(float r, float g, float b, float a)
-{
-    coeffs[0] = r;
-    coeffs[1] = g;
-    coeffs[2] = b;
-    coeffs[3] = a;
-}
-
-static void draw_axis()
-{
-    glDisable(GL_LIGHTING);
-
-    glBegin(GL_LINES);
-        glColor3f(1, 0, 0);
-        glVertex3f(0, 0, 0);
-        glVertex3f(15*CUBE_SIZE, 0, 0);
-
-        glColor3f(0, 1, 0);
-        glVertex3f(0, 0, 0);
-        glVertex3f(0, 15*CUBE_SIZE, 0);
-
-        glColor3f(0, 0, 1);
-        glVertex3f(0, 0, 0);
-        glVertex3f(0, 0, -15*CUBE_SIZE);
-    glEnd();
-
-    glEnable(GL_LIGHTING);
-}
-
-static void set_norm_vert_cylinder(float r, float phi, float h)
-{
-    glNormal3f(r*sin(phi), h, r*cos(phi));
-    glVertex3f(r*sin(phi), h, r*cos(phi));
-}
-
-static void draw_cylinder(float r, float h)
-{
-    float phi;
-
-    glBegin(GL_TRIANGLE_STRIP);
-    for (phi = 0; phi <= 2*PI + EPS; phi += PI/20) {
-        set_norm_vert_cylinder(r, phi, 0);
-        set_norm_vert_cylinder(r, phi, h);
-    }
-    glEnd();
-}
-
-static void create_teleport(float x, float y, float z, char color)
-{
-    /* Reminder: (x,y,z) are the coordinates of the center of the cube */
-    float phi;
-    float r = CUBE_SIZE / 2 - 0.05;
-    float interval_01;
-
-    /* Teleport lines height will be in [a, b] interval */
-    float a = 0.3, b = CUBE_SIZE;
-
-    switch (color) {
-        case 'b':   set_coeffs(0, 0, 1, 0.8); break;
-        case 'r':   set_coeffs(0.9, 0.1, 0.1, 0.8); break;
-        case 'g':   set_coeffs(0, 0.55, 0, 0.8); break;
-        case 'y':   set_coeffs(1, 0.85, 0, 0.8); break;
-        case 'o':   set_coeffs(1, 0.55, 0, 0.8); break;
-        case 'm':   set_coeffs(1, 0.4, 0.75, 0.8); break;
-        case 'p':   set_coeffs(0.3, 0, 0.6, 0.8); break;
-        case 'c':   set_coeffs(0, 0.75, 1, 0.8); break;
-        default:    set_coeffs(1, 1, 1, 0.8); break;
-    }
-
-    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-
-    /* glutTimerFunc(10, on_timer, TELEPORT_TIMER_ID); */
-
-    /* Teleport outer circle: has slightly lower alpha (is transparent) */
-    glBegin(GL_TRIANGLE_FAN);
-
-        glNormal3f(0, 1, 0);
-        glVertex3f(x, y, z);
-
-        for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
-            glVertex3f(x + r * cos(phi), y, z + r * sin(phi));
-        }
-    glEnd();
-
-    /* Teleport inner circle */
-    coeffs[3] = 0.9;
-    glBegin(GL_TRIANGLE_FAN);
-
-        glNormal3f(0, 1, 0);
-        glVertex3f(x, y + EPS/2, z);
-
-        for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
-            glVertex3f(x + r/1.5 * cos(phi), y + EPS/2, z + r/1.5 * sin(phi));
-        }
-    glEnd();
-
-    coeffs[3] = 0.8;
-
-    glLineWidth(1.8);
-    for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
-        interval_01 = rand() / (float) RAND_MAX;
-
-        glBegin(GL_LINES);
-            glVertex3f(x  + r * cos(phi * 1.2 /* + teleport_time */), 
-                       y, 
-                       z + r * sin(phi * 1.2 /* + teleport_time */));
-            glVertex3f(x + r * cos(phi * 1.2 /* + teleport_time */), 
-                       y + (interval_01 * (b-a) + a), 
-                       z + r * sin(phi * 1.2 /* + teleport_time */));
-        glEnd();        
-    }
-}
-
-
 /*
 static void reset_material()
 {
