@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
+#include <time.h>
 
 /* Error-checking function. Used for technical C details */
 #define osAssert(condition, msg) osError(condition, msg)
@@ -14,7 +15,7 @@ void osError(bool condition, const char* msg) {
 }
 
 #define MAX_FILE_NAME 32
-#define PI 3.1415926434
+#define PI 3.14159265359
 #define EPS 0.01
 /* #define TELEPORT_TIMER_ID 1 */
 
@@ -65,9 +66,9 @@ static FieldData** map = NULL;
 
 /*Basic glut callback functions declarations*/
 static void on_keyboard(unsigned char key, int x, int y);
+/* static void on_timer(int value); */
 static void on_reshape(int width, int height);
 static void on_display(void);
-/* static void on_timer(int value); */
 
 /* Function that alocates space for map matrix */
 static FieldData** allocate_map();
@@ -84,13 +85,20 @@ static void create_map();
 static void glut_initialize();
 
 /* Other initialization */
-static void initialize();
+static void other_initialize();
 
 /* Support function that sets coeffs in a global vector */
 static void set_coeffs(float r, float g, float b, float a);
 
 /* Support function that resets default material lighting settings */
 /* static void reset_material(); */
+
+/* Support function that draws coordinate system */
+static void draw_axis();
+
+/* Support functions that draw cylinder */
+static void set_norm_vert_cylinder(float r, float phi, float h);
+static void draw_cylinder(float r, float h);
 
 /* Creates teleport with the given color */
 static void create_teleport(float x, float y, float z, char color);
@@ -123,17 +131,15 @@ int main(int argc, char** argv)
     glutReshapeFunc(on_reshape);
     glutDisplayFunc(on_display);
 
-    /* Initializing basic clear color, depth test and initial var values */
+    /* Initializing basic clear color, depth test, lighting, materials ... */
     glut_initialize();
 
     /* Initializing map dimensions, camera parameters ... */
-    initialize();
+    other_initialize();
 
     /* Putting (directional) light on the scene */
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
-
-    glEnable(GL_NORMALIZE);
 
     /* Setting up light parameters */
     glLightfv(GL_LIGHT0, GL_POSITION, light_position);
@@ -169,56 +175,31 @@ static void on_keyboard(unsigned char key, int x, int y)
         case 27:
             exit(0);
             break;
+
         case 'w':
         case 'W':
-            eye_z += move_param;
-            glutPostRedisplay();
-            break;
-        case 's':
-        case 'S':
             eye_z -= move_param;
             glutPostRedisplay();
             break;
+
+        case 's':
+        case 'S':
+            eye_z += move_param;
+            glutPostRedisplay();
+            break;
+
         case 'a':
         case 'A':
             eye_x -= move_param;
             glutPostRedisplay();
             break;
+
         case 'd':
         case 'D':
             eye_x += move_param;
             glutPostRedisplay();
             break;
     }
-}
-
-static void on_reshape(int width, int height)
-{
-    /* Setting view port and view perspective */
-    glViewport(0, 0, width, height);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(60, (float)width / height, 1, 15);
-}
-
-static void on_display(void)
-{
-    /* GLfloat light_position[] = {eye_x, eye_y, eye_z, 1}; */
-
-    /* Clearing the previous window appearance */
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    /* Cammera settings */
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    gluLookAt(eye_x, eye_y, eye_z,
-              to_x, to_y, to_z,
-              n_x, n_y, n_z);
-
-    create_map();
-
-    glutSwapBuffers();
 }
 
 /*
@@ -236,13 +217,29 @@ static void on_timer(int value)
 }
 */
 
+static void on_reshape(int width, int height)
+{
+    /* Setting view port and view perspective */
+    glViewport(0, 0, width, height);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(60, (float)width / height, 1, 15);
+}
+
 static void glut_initialize()
 {   
     glClearColor(0.7, 0.7, 0.7, 0);
     glEnable(GL_DEPTH_TEST);
+
+    /* Normal vector intesities set to 1 */
+    glEnable(GL_NORMALIZE);
+
+    /* Transparency settings */
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-static void initialize()
+static void other_initialize()
 {
     eye_x = 0*CUBE_SIZE;
     eye_y = 8*CUBE_SIZE;
@@ -259,6 +256,8 @@ static void initialize()
 
     fscanf(f, "%d %d", &map_rows, &map_cols);
     fclose(f);
+
+    srand(time(NULL));
 }
 
 static FieldData** allocate_map()
@@ -345,6 +344,9 @@ static void store_map_connections()
 static void create_map()
 {
     int i, j;
+
+    float switch_height = 0.4;
+    float elevator_height = 0.3;
    
     glPushMatrix();
 
@@ -352,10 +354,12 @@ static void create_map()
         for (i = map_rows - 1; i >= 0; i--) {
             for (j = 0; j < map_cols; j++) {
 
+                /* x and z coordinates of the CENTER of the cube */
                 float x = j*CUBE_SIZE;
                 float z = -(map_rows - 1 - i)*CUBE_SIZE;
 
                 switch (map[i][j].type) {
+                    /* Wall case */
                     case 'w':
                         glPushMatrix();
                             glTranslatef(x, 0, z);
@@ -366,7 +370,6 @@ static void create_map()
                         if (map[i][j].height != 0) {
                             glTranslatef(0, CUBE_SIZE, 0);
                             glScalef(1, map[i][j].height, 1);
-                            /* set_coeffs(0.6, 0.25, 0.1, 0.4); */
                             set_coeffs(0.7, 0.5, 0.2, 1);                           
                             glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
@@ -375,6 +378,7 @@ static void create_map()
                         glPopMatrix();
                         break;
 
+                    /* Lava case */
                     case 'l':
                         glPushMatrix();
                             glTranslatef(x, 0, z);
@@ -384,6 +388,7 @@ static void create_map()
                         glPopMatrix();
                         break;
 
+                    /* Door case */
                     case 'd':
                         glPushMatrix();
                             glTranslatef(x, 0, z);
@@ -418,6 +423,7 @@ static void create_map()
 
                         break;
 
+                    /* Elevator case */
                     case 'e':
                         glPushMatrix();
                             glTranslatef(x, 0, z);
@@ -428,8 +434,8 @@ static void create_map()
 
                         if (map[i][j].height == 0) {
                             glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE - 0.3, z);
-                                glScalef(1, 0.3, 1);
+                                glTranslatef(x, CUBE_SIZE - elevator_height, z);
+                                glScalef(1, elevator_height, 1);
                                 set_coeffs(0.7, 0.7, 0.4, 0.9);
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                                 glutSolidCube(CUBE_SIZE);
@@ -454,6 +460,7 @@ static void create_map()
 
                         break;
 
+                    /* Key case */
                     case 'k':
                         glPushMatrix();
                             glTranslatef(x, 0, z);
@@ -490,6 +497,7 @@ static void create_map()
 
                         break;
 
+                    /* Switch case */
                     case 's':
                         glPushMatrix();
                             glTranslatef(x, 0, z);
@@ -501,9 +509,10 @@ static void create_map()
                         if (map[i][j].height == 0) {
                             glPushMatrix();
                                 glTranslatef(x, CUBE_SIZE, z);
-                                set_coeffs(0.2, 0.2, 0.4, 1);
+                                set_coeffs(0.5, 0.5, 0.7, 1);
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE/3);
+                                glRotatef(30, 0, 0, 1);
+                                draw_cylinder(0.05, switch_height);
                             glPopMatrix();
                         } else {
                             glPushMatrix();
@@ -516,9 +525,10 @@ static void create_map()
 
                             glPushMatrix();
                                 glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
-                                set_coeffs(0.2, 0.2, 0.4, 1);
+                                set_coeffs(0.5, 0.5, 0.7, 1);
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE/3);
+                                glRotatef(-30, 0, 0, 1);
+                                draw_cylinder(0.05, switch_height);
                             glPopMatrix();
                         }
 
@@ -536,7 +546,7 @@ static void create_map()
                         if (map[i][j].height == 0) {
                             glPushMatrix();
                                 glTranslatef(x, 0, z);
-                                create_teleport(-CUBE_SIZE/2, CUBE_SIZE/2 + EPS, CUBE_SIZE/2, map[i][j].color);
+                                create_teleport(0, CUBE_SIZE/2 + EPS, 0, map[i][j].color);
                             glPopMatrix();
                         } else if (map[i][j].height == 1) {
                             glPushMatrix();
@@ -544,7 +554,7 @@ static void create_map()
                                 set_coeffs(0.7, 0.5, 0.2, 1);                           
                                 glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                                 glutSolidCube(CUBE_SIZE);
-                                create_teleport(-CUBE_SIZE/2, CUBE_SIZE/2 + EPS, CUBE_SIZE/2, map[i][j].color);
+                                create_teleport(0, CUBE_SIZE/2 + EPS, 0, map[i][j].color);
                             glPopMatrix();
                         } else {
                             glPushMatrix();
@@ -557,7 +567,7 @@ static void create_map()
 
                             glPushMatrix();
                                 glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
-                                create_teleport(-CUBE_SIZE/2, EPS, CUBE_SIZE/2, map[i][j].color);
+                                create_teleport(0, EPS, 0, map[i][j].color);
                             glPopMatrix();
                         }
 
@@ -578,43 +588,107 @@ static void set_coeffs(float r, float g, float b, float a)
     coeffs[3] = a;
 }
 
-static void create_teleport(float x, float y, float z, char color)
+static void draw_axis()
+{
+    glDisable(GL_LIGHTING);
+
+    glBegin(GL_LINES);
+        glColor3f(1, 0, 0);
+        glVertex3f(0, 0, 0);
+        glVertex3f(15*CUBE_SIZE, 0, 0);
+
+        glColor3f(0, 1, 0);
+        glVertex3f(0, 0, 0);
+        glVertex3f(0, 15*CUBE_SIZE, 0);
+
+        glColor3f(0, 0, 1);
+        glVertex3f(0, 0, 0);
+        glVertex3f(0, 0, -15*CUBE_SIZE);
+    glEnd();
+
+    glEnable(GL_LIGHTING);
+}
+
+static void set_norm_vert_cylinder(float r, float phi, float h)
+{
+    glNormal3f(r*sin(phi), h, r*cos(phi));
+    glVertex3f(r*sin(phi), h, r*cos(phi));
+}
+
+static void draw_cylinder(float r, float h)
 {
     float phi;
+
+    glBegin(GL_TRIANGLE_STRIP);
+    for (phi = 0; phi <= 2*PI + EPS; phi += PI/20) {
+        set_norm_vert_cylinder(r, phi, 0);
+        set_norm_vert_cylinder(r, phi, h);
+    }
+    glEnd();
+}
+
+static void create_teleport(float x, float y, float z, char color)
+{
+    /* Reminder: (x,y,z) are the coordinates of the center of the cube */
+    float phi;
     float r = CUBE_SIZE / 2 - 0.05;
+    float interval_01;
+
+    /* Teleport lines height will be in [a, b] interval */
+    float a = 0.3, b = CUBE_SIZE;
 
     switch (color) {
-        case 'b':   set_coeffs(0, 0, 1, 1); break;
-        case 'r':   set_coeffs(0.9, 0.1, 0.1, 1); break;
-        case 'g':   set_coeffs(0, 0.55, 0, 1); break;
-        case 'y':   set_coeffs(1, 0.85, 0, 1); break;
-        case 'o':   set_coeffs(1, 0.55, 0, 1); break;
-        case 'm':   set_coeffs(1, 0.4, 0.75, 1); break;
-        case 'p':   set_coeffs(0.3, 0, 0.6, 1); break;
-        case 'c':   set_coeffs(0, 0.75, 1, 1); break;
-        default:    set_coeffs(1, 1, 1, 1); break;
+        case 'b':   set_coeffs(0, 0, 1, 0.8); break;
+        case 'r':   set_coeffs(0.9, 0.1, 0.1, 0.8); break;
+        case 'g':   set_coeffs(0, 0.55, 0, 0.8); break;
+        case 'y':   set_coeffs(1, 0.85, 0, 0.8); break;
+        case 'o':   set_coeffs(1, 0.55, 0, 0.8); break;
+        case 'm':   set_coeffs(1, 0.4, 0.75, 0.8); break;
+        case 'p':   set_coeffs(0.3, 0, 0.6, 0.8); break;
+        case 'c':   set_coeffs(0, 0.75, 1, 0.8); break;
+        default:    set_coeffs(1, 1, 1, 0.8); break;
     }
 
     glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
 
     /* glutTimerFunc(10, on_timer, TELEPORT_TIMER_ID); */
 
+    /* Teleport outer circle: has slightly lower alpha (is transparent) */
     glBegin(GL_TRIANGLE_FAN);
 
         glNormal3f(0, 1, 0);
-        glVertex3f(x + CUBE_SIZE / 2, y, z - CUBE_SIZE / 2);
+        glVertex3f(x, y, z);
 
         for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
-            glVertex3f((x + CUBE_SIZE / 2) + r * cos(phi), y, (z - CUBE_SIZE / 2) + r * sin(phi));
+            glVertex3f(x + r * cos(phi), y, z + r * sin(phi));
         }
     glEnd();
 
+    /* Teleport inner circle */
+    coeffs[3] = 0.9;
+    glBegin(GL_TRIANGLE_FAN);
+
+        glNormal3f(0, 1, 0);
+        glVertex3f(x, y + EPS/2, z);
+
+        for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
+            glVertex3f(x + r/1.5 * cos(phi), y + EPS/2, z + r/1.5 * sin(phi));
+        }
+    glEnd();
+
+    coeffs[3] = 0.8;
+
+    glLineWidth(1.8);
     for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
+        interval_01 = rand() / (float) RAND_MAX;
+
         glBegin(GL_LINES);
-            glVertex3f((x + CUBE_SIZE / 2) + r * cos(phi /* + teleport_time */), y, 
-                        (z - CUBE_SIZE / 2) + r * sin(phi /* + teleport_time */));
-            glVertex3f((x + CUBE_SIZE / 2) + r * cos(phi /* + teleport_time */), y + CUBE_SIZE/1.5, 
-                        (z - CUBE_SIZE / 2) + r * sin(phi /* + teleport_time */));
+            glVertex3f(x  + r * cos(phi * 1.2 /* + teleport_time */), 
+                       y, 
+                       z + r * sin(phi * 1.2 /* + teleport_time */));
+            glVertex3f(x + r * cos(phi * 1.2 /* + teleport_time */), 
+                       y + (interval_01 * (b-a) + a), 
+                       z + r * sin(phi * 1.2 /* + teleport_time */));
         glEnd();        
     }
 }
@@ -633,3 +707,25 @@ static void reset_material()
     glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
 }
 */
+
+static void on_display(void)
+{
+    /* GLfloat light_position[] = {eye_x, eye_y, eye_z, 1}; */
+
+    /* Clearing the previous window appearance */
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    /* Cammera settings */
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    gluLookAt(eye_x, eye_y, eye_z,
+              to_x, to_y, to_z,
+              n_x, n_y, n_z);
+
+    draw_axis();
+
+    create_map();
+
+    glutSwapBuffers();
+}
