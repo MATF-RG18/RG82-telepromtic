@@ -42,7 +42,7 @@ typedef struct field {
 /* Height and width of the map */
 static int map_rows, map_cols;
 /* Metadata input file (map info about every cube) */
-const static char map_input_file[MAX_FILE_NAME] = "map.txt";
+const static char map_input_file[MAX_FILE_NAME] = "map_test.txt";
 /* Map dimensions file */
 const static char map_dimensions_file[MAX_FILE_NAME] = "map_dimensions.txt";
 /* Map connections and teleport colors file */
@@ -91,8 +91,8 @@ static void glut_initialize();
 /* Other initialization */
 static void other_initialize();
 
-/* Support function that sets coeffs in a global vector */
-static void set_coeffs(float r, float g, float b, float a);
+/* Support function that sets diffuse coeffs in a global vector */
+static void set_diffuse(float r, float g, float b, float a);
 
 /* Support function that resets default material lighting settings */
 /* static void reset_material(); */
@@ -100,12 +100,13 @@ static void set_coeffs(float r, float g, float b, float a);
 /* Support function that draws coordinate system */
 static void draw_axis();
 
-/* Creates wall with h height */
-static void creat_wall(float h);
-
 /* Support functions that draw cylinder */
 static void set_norm_vert_cylinder(float r, float phi, float h);
 static void draw_cylinder(float r, float h);
+
+/* Creates wall with the given cube size and height.
+ * Wall is constructed of height cubes piled on each other. */
+static void create_wall(float cube_size, int height);
 
 /* Creates keys on the map */
 static void create_key();
@@ -167,7 +168,6 @@ int main(int argc, char** argv)
     map = allocate_map();
     store_map_data();
     store_map_connections();
-
 
     /* Entering OpenGL main loop */
     glutMainLoop();
@@ -359,12 +359,13 @@ static void store_map_connections()
     fclose(f);
 }
 
-static void set_coeffs(float r, float g, float b, float a)
+static void set_diffuse(float r, float g, float b, float a)
 {
     coeffs[0] = r;
     coeffs[1] = g;
     coeffs[2] = b;
     coeffs[3] = a;
+    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
 }
 
 static void draw_axis()
@@ -406,6 +407,19 @@ static void draw_cylinder(float r, float h)
     glEnd();
 }
 
+static void create_wall(float cube_size, int height)
+{
+    int i;
+
+    glPushMatrix();
+        glTranslatef(0, -cube_size, 0);
+        for (i = 1; i <= height; i++) {
+            glTranslatef(0, cube_size, 0);
+            glutSolidCube(cube_size);
+        }
+    glPopMatrix();
+}
+
 static void create_key()
 {
     float body_radius = 0.015;
@@ -444,18 +458,16 @@ static void create_teleport(float x, float y, float z, char color)
     float a = 0.3, b = CUBE_SIZE;
 
     switch (color) {
-        case 'b':   set_coeffs(0, 0, 1, 0.8); break;
-        case 'r':   set_coeffs(0.9, 0.1, 0.1, 0.8); break;
-        case 'g':   set_coeffs(0, 0.55, 0, 0.8); break;
-        case 'y':   set_coeffs(1, 0.85, 0, 0.8); break;
-        case 'o':   set_coeffs(1, 0.55, 0, 0.8); break;
-        case 'm':   set_coeffs(1, 0.4, 0.75, 0.8); break;
-        case 'p':   set_coeffs(0.3, 0, 0.6, 0.8); break;
-        case 'c':   set_coeffs(0, 0.75, 1, 0.8); break;
-        default:    set_coeffs(1, 1, 1, 0.8); break;
+        case 'b':   set_diffuse(0, 0, 1, 0.8); break;
+        case 'r':   set_diffuse(0.9, 0.1, 0.1, 0.8); break;
+        case 'g':   set_diffuse(0, 0.55, 0, 0.8); break;
+        case 'y':   set_diffuse(1, 0.85, 0, 0.8); break;
+        case 'o':   set_diffuse(1, 0.55, 0, 0.8); break;
+        case 'm':   set_diffuse(1, 0.4, 0.75, 0.8); break;
+        case 'p':   set_diffuse(0.3, 0, 0.6, 0.8); break;
+        case 'c':   set_diffuse(0, 0.75, 1, 0.8); break;
+        default:    set_diffuse(1, 1, 1, 0.8); break;
     }
-
-    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
 
     /* glutTimerFunc(10, on_timer, TELEPORT_TIMER_ID); */
 
@@ -497,6 +509,8 @@ static void create_teleport(float x, float y, float z, char color)
                        z + r * sin(phi * 1.2 /* + teleport_time */));
         glEnd();        
     }
+
+    coeffs[3] = 1;
 }
 
 static void create_map()
@@ -504,11 +518,20 @@ static void create_map()
     int i, j;
 
     float switch_height = 0.4;
-    float elevator_height = 0.3;
+    float elevator_height = 0.2;
+
+    /* Special factor that fixes the elevator position since scaling
+     * will cause the elevator to float in space */
+    float elevator_scale_move_factor = 0.25;
+
+    /* Special factor that fixes switch position since rotation
+     * will slightly move the switch over x-axis */
+    float switch_rotate_move_factor = 0.1;
    
     glPushMatrix();
 
         glTranslatef(CUBE_SIZE / 2, - CUBE_SIZE / 2, - CUBE_SIZE / 2);
+
         for (i = map_rows - 1; i >= 0; i--) {
             for (j = 0; j < map_cols; j++) {
 
@@ -519,214 +542,147 @@ static void create_map()
                 switch (map[i][j].type) {
                     /* Wall case */
                     case 'w':
+                        /* Grass */
                         glPushMatrix();
                             glTranslatef(x, 0, z);
-                            set_coeffs(0.2, 0.7, 0.1, 1);
+                            set_diffuse(0.2, 0.7, 0.1, 1);
                             glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
                             glutSolidCube(CUBE_SIZE);
 
+                        /* Wall */
                         if (map[i][j].height != 0) {
                             glTranslatef(0, CUBE_SIZE, 0);
-                            glScalef(1, map[i][j].height, 1);
-                            set_coeffs(0.7, 0.5, 0.2, 1);                           
-                            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                            glutSolidCube(CUBE_SIZE);
+                            set_diffuse(0.7, 0.5, 0.2, 1);                           
+                            create_wall(CUBE_SIZE, map[i][j].height);
                         }
 
                         glPopMatrix();
                         break;
 
-                    /* Lava case */
+                    /* Lava case - always with 0 height*/
                     case 'l':
                         glPushMatrix();
                             glTranslatef(x, 0, z);
-                            set_coeffs(0.9, 0.2, 0.1, 1);
-                            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                            set_diffuse(0.9, 0.2, 0.1, 1);
                             glutSolidCube(CUBE_SIZE);
                         glPopMatrix();
                         break;
 
                     /* Door case */
                     case 'd':
+                        /* Grass and wall */
                         glPushMatrix();
                             glTranslatef(x, 0, z);
-                            set_coeffs(0.2, 0.7, 0.1, 1);
-                            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                            set_diffuse(0.2, 0.7, 0.1, 1);
                             glutSolidCube(CUBE_SIZE);
+                        
+                            glTranslatef(0, CUBE_SIZE, 0);
+                            set_diffuse(0.7, 0.5, 0.2, 1);                           
+                            create_wall(CUBE_SIZE, map[i][j].height - 1);
                         glPopMatrix();
 
-                        if (map[i][j].height == 0) {
-                            glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE, z);
-                                set_coeffs(0.5, 0.2, 0.1, 1);
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE);
-                            glPopMatrix();
-                        } else {
-                            glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE, z);
-                                glScalef(1, map[i][j].height, 1);
-                                set_coeffs(0.5, 0.6, 0.1, 1);
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE);
-                            glPopMatrix();
-
-                            glPushMatrix();
-                                glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
-                                set_coeffs(0.5, 0.2, 0.1, 1);
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE);
-                            glPopMatrix();
-                        }
-
+                        /* Door */
+                        glPushMatrix();
+                            glTranslatef(x, map[i][j].height*CUBE_SIZE, z);
+                            set_diffuse(0.5, 0.2, 0.1, 1);
+                            glutSolidCube(CUBE_SIZE);
+                        glPopMatrix();
                         break;
 
                     /* Elevator case */
                     case 'e':
+                        /* Grass and wall */
                         glPushMatrix();
                             glTranslatef(x, 0, z);
-                            set_coeffs(0.2, 0.7, 0.1, 1);
-                            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                            set_diffuse(0.2, 0.7, 0.1, 1);
                             glutSolidCube(CUBE_SIZE);
+                        
+                            glTranslatef(0, CUBE_SIZE, 0);
+                            set_diffuse(0.7, 0.5, 0.2, 1);                           
+                            create_wall(CUBE_SIZE, map[i][j].height - 1);
                         glPopMatrix();
 
-                        if (map[i][j].height == 0) {
-                            glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE - elevator_height, z);
-                                glScalef(1, elevator_height, 1);
-                                set_coeffs(0.7, 0.7, 0.4, 0.9);
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE);
-                            glPopMatrix();
-                        } else {
-                            glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE, z);
-                                glScalef(1, map[i][j].height, 1);
-                                set_coeffs(0.7, 0.5, 0.2, 1);                               
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE);
-                            glPopMatrix();
-
-                            glPushMatrix();
-                                glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
-                                glScalef(1, 0.3, 1);
-                                set_coeffs(0.7, 0.7, 0.4, 0.9);
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE);
-                            glPopMatrix();
-                        }
-
+                        /* Elevator */
+                        glPushMatrix();
+                            glTranslatef(x, map[i][j].height*CUBE_SIZE, z);
+                            glTranslatef(0, -elevator_scale_move_factor, 0);
+                            glScalef(1, elevator_height, 1);
+                            set_diffuse(0.7, 0.7, 0.4, 1);
+                            glutSolidCube(CUBE_SIZE);
+                        glPopMatrix();
                         break;
 
                     /* Key case */
                     case 'k':
+                        /* Grass and wall */
                         glPushMatrix();
                             glTranslatef(x, 0, z);
-                            set_coeffs(0.2, 0.7, 0.1, 1);
-                            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                            set_diffuse(0.2, 0.7, 0.1, 1);
                             glutSolidCube(CUBE_SIZE);
+                        
+                            glTranslatef(0, CUBE_SIZE, 0);
+                            set_diffuse(0.7, 0.5, 0.2, 1);                           
+                            create_wall(CUBE_SIZE, map[i][j].height - 1);
                         glPopMatrix();
 
-                        if (map[i][j].height == 0) {
-                            glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE + 5*EPS, z);
-                                set_coeffs(0.8, 0.8, 0, 1);
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                create_key();
-                            glPopMatrix();
-                        } else {
-                            glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE, z);
-                                glScalef(1, map[i][j].height, 1);
-                                set_coeffs(0.7, 0.5, 0.2, 1);                               
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE);
-                            glPopMatrix();
-
-                            glPushMatrix();
-                                glTranslatef(x, map[i][j].height * CUBE_SIZE + 5*EPS, z);
-                                set_coeffs(0.8, 0.8, 0, 1);
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                create_key();
-                            glPopMatrix();
-                        }
-
+                        /* Key */
+                        glPushMatrix();
+                            glTranslatef(x, map[i][j].height*CUBE_SIZE, z);
+                            set_diffuse(0.8, 0.8, 0, 1);
+                            create_key();
+                        glPopMatrix();
                         break;
 
                     /* Switch case */
                     case 's':
+                        /* Grass and wall */
                         glPushMatrix();
                             glTranslatef(x, 0, z);
-                            set_coeffs(0.2, 0.7, 0.1, 1);
-                            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                            set_diffuse(0.2, 0.7, 0.1, 1);
                             glutSolidCube(CUBE_SIZE);
+                        
+                            glTranslatef(0, CUBE_SIZE, 0);
+                            set_diffuse(0.7, 0.5, 0.2, 1);                           
+                            create_wall(CUBE_SIZE, map[i][j].height - 1);
                         glPopMatrix();
 
-                        if (map[i][j].height == 0) {
-                            glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE, z);
-                                set_coeffs(0.5, 0.5, 0.7, 1);
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glRotatef(30, 0, 0, 1);
-                                draw_cylinder(0.035, switch_height);
-                            glPopMatrix();
-                        } else {
-                            glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE, z);
-                                glScalef(1, map[i][j].height, 1);
-                                set_coeffs(0.7, 0.5, 0.2, 1);                               
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE);
-                            glPopMatrix();
+                        /* Switch */
+                        glPushMatrix();
+                            glTranslatef(x, map[i][j].height*CUBE_SIZE, z);
 
-                            glPushMatrix();
-                                glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
-                                set_coeffs(0.5, 0.5, 0.7, 1);
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glRotatef(-30, 0, 0, 1);
-                                draw_cylinder(0.035, switch_height);
-                            glPopMatrix();
-                        }
+                            /* glRotatef(-30, 0, 0, 1) will slightly move the switch
+                             * to the right; we fix it by moving slightly to the left.
+                             * Also, -CUBE_SIZE/2 is to lower the floating effect */
+                            glTranslatef(-switch_rotate_move_factor, -CUBE_SIZE/2, 0);
 
+                            glRotatef(-30, 0, 0, 1);
+                            set_diffuse(0.5, 0.5, 0.7, 1);
+                            draw_cylinder(0.035, switch_height);
+                        glPopMatrix();
                         break;
 
                     /* Teleport case */
                     default:
+                        /* Grass and wall */
                         glPushMatrix();
                             glTranslatef(x, 0, z);
-                            set_coeffs(0.2, 0.7, 0.1, 1);
-                            glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
+                            set_diffuse(0.2, 0.7, 0.1, 1);
                             glutSolidCube(CUBE_SIZE);
+                        
+                            glTranslatef(0, CUBE_SIZE, 0);
+                            set_diffuse(0.7, 0.5, 0.2, 1);                           
+                            create_wall(CUBE_SIZE, map[i][j].height - 1);
                         glPopMatrix();
 
-                        if (map[i][j].height == 0) {
-                            glPushMatrix();
-                                glTranslatef(x, 0, z);
-                                create_teleport(0, CUBE_SIZE/2 + EPS, 0, map[i][j].color);
-                            glPopMatrix();
-                        } else if (map[i][j].height == 1) {
-                            glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE, z);
-                                set_coeffs(0.7, 0.5, 0.2, 1);                           
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE);
-                                create_teleport(0, CUBE_SIZE/2 + EPS, 0, map[i][j].color);
-                            glPopMatrix();
-                        } else {
-                            glPushMatrix();
-                                glTranslatef(x, CUBE_SIZE, z);
-                                glScalef(1, map[i][j].height, 1);
-                                set_coeffs(0.7, 0.5, 0.2, 1);                           
-                                glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, coeffs);
-                                glutSolidCube(CUBE_SIZE);
-                            glPopMatrix();
+                        /* Teleport */
+                        glPushMatrix();
+                            glTranslatef(x, map[i][j].height*CUBE_SIZE, z);
 
-                            glPushMatrix();
-                                glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
-                                create_teleport(0, EPS, 0, map[i][j].color);
-                            glPopMatrix();
-                        }
+                            /* Teleport floating effect fix */
+                            glTranslatef(0, -CUBE_SIZE/2 + EPS, 0);
 
+                            create_teleport(0, 0, 0, map[i][j].color);
+                        glPopMatrix();
                         break;
                 }
             }
