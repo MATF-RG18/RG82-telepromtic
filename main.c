@@ -6,10 +6,16 @@
 #include <time.h>
 
 #define MAX_FILE_NAME 32
+
 #define PI 3.14159265359
 #define EPS 0.01
 #define RAD_TO_DEG 180/PI
 #define DEG_TO_RAD PI/180
+
+#define SWITCH_TIMER_ID 50
+#define KEY_TIMER_ID 60
+#define GLOBAL_TIMER_ID 0
+#define TELEPORT_TIMER_ID 1
 
 /* Error-checking function. Used for technical C details */
 #define osAssert(condition, msg) osError(condition, msg)
@@ -21,7 +27,6 @@ void osError(bool condition, const char* msg) {
 }
 
 
-/* #define TELEPORT_TIMER_ID 1 */
 
 /* Structure that will keep data for every field cube. 
  * 1) type can be: 'w' - wall, 'l' - lava, 't' - teleport, 'd' - door, 'e' - elevator,
@@ -42,7 +47,7 @@ typedef struct field {
 /* Height and width of the map */
 static int map_rows, map_cols;
 /* Metadata input file (map info about every cube) */
-const static char map_input_file[MAX_FILE_NAME] = "map_test.txt";
+const static char map_input_file[MAX_FILE_NAME] = "map.txt";
 /* Map dimensions file */
 const static char map_dimensions_file[MAX_FILE_NAME] = "map_dimensions.txt";
 /* Map connections and teleport colors file */
@@ -67,10 +72,12 @@ static FieldData** map = NULL;
 /* Teleport time parameter and active indicator*/
 /* static float teleport_time = 0; */
 /* static bool teleport_timer_active = false; */
+static bool global_timer_active = true;
+static float global_time_parameter = 0;
 
 /*Basic glut callback functions declarations*/
 static void on_keyboard(unsigned char key, int x, int y);
-/* static void on_timer(int value); */
+static void on_timer(int value);
 static void on_reshape(int width, int height);
 static void on_display(void);
 
@@ -169,6 +176,8 @@ int main(int argc, char** argv)
     store_map_data();
     store_map_connections();
 
+    glutTimerFunc(20, on_timer, GLOBAL_TIMER_ID);
+
     /* Entering OpenGL main loop */
     glutMainLoop();
 
@@ -185,6 +194,32 @@ static void on_keyboard(unsigned char key, int x, int y)
         case 27:
             exit(0);
             break;
+
+        case 'z':
+        case 'Z':
+            if (!global_timer_active) {
+                global_timer_active = true;
+                glutTimerFunc(20, on_timer, GLOBAL_TIMER_ID);
+            }
+            break;
+
+        case 'x':
+        case 'X':
+            global_time_parameter = false;
+            glutPostRedisplay();
+            break;
+
+        case 'r':
+        case 'R':
+            /* Also reseting camera position */
+            eye_x = 0;
+            eye_y = 8*CUBE_SIZE;
+            eye_z = 0;
+
+            global_time_parameter = 0;
+            glutPostRedisplay();
+            break;
+
 
         case 'w':
         case 'W':
@@ -209,31 +244,23 @@ static void on_keyboard(unsigned char key, int x, int y)
             eye_x += move_param;
             glutPostRedisplay();
             break;
-
-        case 'r':
-        case 'R':
-            eye_x = 0;
-            eye_y = 8*CUBE_SIZE;
-            eye_z = 0;
-            glutPostRedisplay();
-            break;
     }
 }
 
-/*
 static void on_timer(int value)
 {
-    if (value != TELEPORT_TIMER_ID) {
+    if (value != GLOBAL_TIMER_ID) {
         return;
     }
 
-    teleport_time += 0.01;
+    global_time_parameter += 1;
 
     glutPostRedisplay();
 
-    glutTimerFunc(10, on_timer, TELEPORT_TIMER_ID);
+    if (global_time_parameter) {
+        glutTimerFunc(20, on_timer, GLOBAL_TIMER_ID);
+    }
 }
-*/
 
 static void on_reshape(int width, int height)
 {
@@ -523,10 +550,6 @@ static void create_map()
     /* Special factor that fixes the elevator position since scaling
      * will cause the elevator to float in space */
     float elevator_scale_move_factor = 0.25;
-
-    /* Special factor that fixes switch position since rotation
-     * will slightly move the switch over x-axis */
-    float switch_rotate_move_factor = 0.1;
    
     glPushMatrix();
 
@@ -629,6 +652,10 @@ static void create_map()
                         glPushMatrix();
                             glTranslatef(x, map[i][j].height*CUBE_SIZE, z);
                             set_diffuse(0.8, 0.8, 0, 1);
+
+                            glTranslatef(0, CUBE_SIZE/5 * sin(2 * global_time_parameter * DEG_TO_RAD), 0);
+                            glRotatef(-global_time_parameter * 2, 0, 1, 0);
+
                             create_key();
                         glPopMatrix();
                         break;
@@ -653,9 +680,11 @@ static void create_map()
                             /* glRotatef(-30, 0, 0, 1) will slightly move the switch
                              * to the right; we fix it by moving slightly to the left.
                              * Also, -CUBE_SIZE/2 is to lower the floating effect */
-                            glTranslatef(-switch_rotate_move_factor, -CUBE_SIZE/2, 0);
+                            glTranslatef(0, -CUBE_SIZE/2, 0);
 
-                            glRotatef(-30, 0, 0, 1);
+                            glRotatef(global_time_parameter * 2, 0, 1, 0);
+
+                            glRotatef(-25, 0, 0, 1);
                             set_diffuse(0.5, 0.5, 0.7, 1);
                             draw_cylinder(0.035, switch_height);
                         glPopMatrix();
