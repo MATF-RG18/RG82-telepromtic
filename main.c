@@ -474,70 +474,88 @@ static void create_key()
     glPopMatrix();
 }
 
+void set_vector3f(GLfloat* vector, float r, float g, float b) {
+    vector[0] = r;
+    vector[1] = g;
+    vector[2] = b;
+}
+
 static void create_teleport(float x, float y, float z, char color)
 {
     /* Reminder: (x,y,z) are the coordinates of the center of the cube */
     float phi;
     float r = CUBE_SIZE / 2 - 0.05;
-    float interval_01;
 
-    /* Teleport lines height will be in [a, b] interval */
-    float a = 0.3, b = CUBE_SIZE;
+    GLfloat inner[3];
+    GLfloat outer[3];
 
     switch (color) {
-        case 'b':   set_diffuse(0, 0, 1, 0.8); break;
-        case 'r':   set_diffuse(0.9, 0.1, 0.1, 0.8); break;
-        case 'g':   set_diffuse(0, 0.55, 0, 0.8); break;
-        case 'y':   set_diffuse(1, 0.85, 0, 0.8); break;
-        case 'o':   set_diffuse(1, 0.55, 0, 0.8); break;
-        case 'm':   set_diffuse(1, 0.4, 0.75, 0.8); break;
-        case 'p':   set_diffuse(0.3, 0, 0.6, 0.8); break;
-        case 'c':   set_diffuse(0, 0.75, 1, 0.8); break;
-        default:    set_diffuse(1, 1, 1, 0.8); break;
+        case 'b':   
+            set_vector3f(inner, 0, 0.3, 1);             
+            set_vector3f(outer, 0, 0.15, 0.9); 
+            break;
+        case 'r':   
+            set_vector3f(inner, 1, 0.1, 0.1);
+            set_vector3f(outer, 0.85, 0, 0);
+            break;
+        case 'g':   
+            set_vector3f(inner, 0.1, 0.7, 0.1);
+            set_vector3f(outer, 0, 0.55, 0);
+            break;
+        case 'y':   
+            set_vector3f(inner, 0.9, 0.55, 0);
+            set_vector3f(outer, 1, 0.85, 0.1);
+            break;
+        case 'o':   
+            set_vector3f(inner, 1, 0.6, 0.1);
+            set_vector3f(outer, 0.9, 0.4, 0);
+            break;
+        case 'm':   
+            set_vector3f(inner, 0.85, 0.3, 0.6); 
+            set_vector3f(outer, 1, 0.4, 0.75);
+            break;
+        case 'p':   
+            set_vector3f(inner, 0.4, 0.1, 0.7);
+            set_vector3f(outer, 0.3, 0, 0.55);
+            break;
+        case 'c':   
+            set_vector3f(inner, 0, 0.5, 0.85); 
+            set_vector3f(outer, 0.1, 0.75, 1); 
+            break;
+        default:    
+            set_vector3f(inner, 1, 1, 1); 
+            set_vector3f(outer, 0.9, 0.9, 0.9); 
+            break;
     }
 
-    /* glutTimerFunc(10, on_timer, TELEPORT_TIMER_ID); */
+    glDisable(GL_LIGHTING);
 
-    /* Teleport outer circle: has slightly lower alpha (is transparent) */
     glBegin(GL_TRIANGLE_FAN);
 
-        glNormal3f(0, 1, 0);
+        glColor3fv(inner);
         glVertex3f(x, y, z);
 
         for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
+            glColor3fv(outer);
             glVertex3f(x + r * cos(phi), y, z + r * sin(phi));
         }
     glEnd();
 
-    /* Teleport inner circle */
-    coeffs[3] = 0.9;
-    glBegin(GL_TRIANGLE_FAN);
-
-        glNormal3f(0, 1, 0);
-        glVertex3f(x, y + EPS/2, z);
-
-        for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
-            glVertex3f(x + r/1.5 * cos(phi), y + EPS/2, z + r/1.5 * sin(phi));
-        }
-    glEnd();
-
-    coeffs[3] = 0.8;
-
     glLineWidth(1.8);
-    for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
-        interval_01 = rand() / (float) RAND_MAX;
+    glColor3fv(outer);
 
+    for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
         glBegin(GL_LINES);
             glVertex3f(x  + r * cos(phi * 1.2 /* + teleport_time */), 
                        y, 
                        z + r * sin(phi * 1.2 /* + teleport_time */));
             glVertex3f(x + r * cos(phi * 1.2 /* + teleport_time */), 
-                       y + (interval_01 * (b-a) + a), 
+                       y + CUBE_SIZE/1.3, 
                        z + r * sin(phi * 1.2 /* + teleport_time */));
         glEnd();        
     }
 
-    coeffs[3] = 1;
+    glEnable(GL_LIGHTING);
 }
 
 static void create_map()
