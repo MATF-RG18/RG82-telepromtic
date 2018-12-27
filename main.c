@@ -5,22 +5,6 @@
 #include <math.h>
 #include <time.h>
 
-#define MAX_FILE_NAME 32
-
-#define PI 3.14159265359
-#define EPS 0.01
-#define RAD_TO_DEG 180/PI
-#define DEG_TO_RAD PI/180
-
-#define GLOBAL_TIMER_ID 0
-#define TELEPORT_TIMER_ID 1
-#define TIMER_INTERVAL 20
-
-#define ELEVATOR_TIMER_ID_12 12
-#define ELEVATOR_TIMER_ID_58 58
-#define ELEVATOR_TIMER_ID_89 89
-#define ELEVATOR_TIMER_ID_25 25
-
 /* Error-checking function. Used for technical C details */
 #define osAssert(condition, msg) osError(condition, msg)
 void osError(bool condition, const char* msg) {
@@ -30,6 +14,25 @@ void osError(bool condition, const char* msg) {
     }
 }
 
+#define MAX_FILE_NAME 32
+
+#define PI 3.14159265359
+#define EPS 0.01
+#define RAD_TO_DEG 180/PI
+#define DEG_TO_RAD PI/180
+
+#define GLOBAL_TIMER_ID 0
+#define TIMER_INTERVAL 20
+
+#define ELEVATOR_TIMER_ID_12 12
+#define ELEVATOR_TIMER_ID_58 58
+#define ELEVATOR_TIMER_ID_89 89
+#define ELEVATOR_TIMER_ID_25 25
+
+#define DOOR_TIMER_ID_18 18
+#define DOOR_TIMER_ID_27 27
+#define DOOR_TIMER_ID_41 41
+#define DOOR_TIMER_ID_86 86
 
 /* Structure that will keep data for every field cube. 
  * 1) type can be: 'w' - wall, 'l' - lava, 't' - teleport, 'd' - door, 'e' - elevator,
@@ -78,7 +81,7 @@ static FieldData** map = NULL;
 static bool global_timer_active = true;
 static float global_time_parameter = 0;
 
-/* Switch flags and parameters: they are connected respectively */
+/* Switch/Elevator flags and parameters: they are connected respectively */
 static bool has_switch_98 = false;
 static float elevator_parameter_12 = 0;
 static bool elevator_timer_12_active = false;
@@ -94,6 +97,23 @@ static bool elevator_timer_89_active = false;
 static bool has_switch_77 = false;
 static float elevator_parameter_25 = 0;
 static bool elevator_timer_25_active = false;
+
+/* Key/Door flags and parameters: they are connected respectively */
+static bool has_key_99 = false;
+static float door_parameter_18 = 0;
+static bool door_timer_18_active = false;
+
+static bool has_key_23 = false;
+static float door_parameter_27 = 0;
+static bool door_timer_27_active = false;
+
+static bool has_key_11 = false;
+static float door_parameter_41 = 0;
+static bool door_timer_41_active = false;
+
+static bool has_key_71 = false;
+static float door_parameter_86 = 0;
+static bool door_timer_86_active = false;
 
 /*Basic glut callback functions declarations*/
 static void on_keyboard(unsigned char key, int x, int y);
@@ -143,6 +163,9 @@ static void create_teleport(float x, float y, float z, char color);
 
 /* Moves elevators if their connected switches are gathered */
 static void move_elevator(int i, int j, float e_height);
+
+/* Moves doors if their connected keys are gathered */
+static void move_door(int i, int j);
 
 int main(int argc, char** argv)
 {
@@ -230,11 +253,31 @@ static void on_keyboard(unsigned char key, int x, int y)
 
         case '3':
             has_switch_73 = true;
-            /* glutPostRedisplay(); */
+            glutPostRedisplay();
             break;
 
         case '4':
             has_switch_77 = true;
+            glutPostRedisplay();
+            break;
+
+        case '5':
+            has_key_11 = true;
+            glutPostRedisplay();
+            break;
+
+        case '6':
+            has_key_23 = true;
+            glutPostRedisplay();
+            break;
+
+        case '7':
+            has_key_71 = true;
+            glutPostRedisplay();
+            break;
+
+        case '8':
+            has_key_99 = true;
             glutPostRedisplay();
             break;
 
@@ -276,6 +319,21 @@ static void on_keyboard(unsigned char key, int x, int y)
             has_switch_73 = false;
             has_switch_77 = false;
             has_switch_98 = false;
+
+            door_parameter_18 = 0;
+            door_parameter_27 = 0;
+            door_parameter_41 = 0;
+            door_parameter_86 = 0;
+
+            door_timer_18_active = false;
+            door_timer_27_active = false;
+            door_timer_41_active = false;
+            door_timer_86_active = false;
+
+            has_key_11 = false;
+            has_key_23 = false;
+            has_key_71 = false;
+            has_key_99 = false;
 
             glutPostRedisplay();
             break;
@@ -332,7 +390,7 @@ static void on_timer(int value)
 
         glutPostRedisplay();
 
-        if (elevator_parameter_58) {
+        if (elevator_timer_58_active) {
             glutTimerFunc(TIMER_INTERVAL, on_timer, ELEVATOR_TIMER_ID_58);
         }
     } else if (value == ELEVATOR_TIMER_ID_89) {
@@ -341,7 +399,7 @@ static void on_timer(int value)
 
         glutPostRedisplay();
 
-        if (elevator_parameter_89) {
+        if (elevator_timer_89_active) {
             glutTimerFunc(TIMER_INTERVAL, on_timer, ELEVATOR_TIMER_ID_89);
         }
     } else if (value == ELEVATOR_TIMER_ID_25) {
@@ -350,8 +408,60 @@ static void on_timer(int value)
 
         glutPostRedisplay();
 
-        if (elevator_parameter_25) {
+        if (elevator_timer_25_active) {
             glutTimerFunc(TIMER_INTERVAL, on_timer, ELEVATOR_TIMER_ID_25);
+        }
+    } else if (value == DOOR_TIMER_ID_18) {
+
+        door_parameter_18 += 0.01;
+        if (door_parameter_18 >= CUBE_SIZE + 0.1) {
+            door_parameter_18 = -1;
+            door_timer_18_active = false;
+        }
+
+        glutPostRedisplay();
+
+        if (door_timer_18_active) {
+            glutTimerFunc(TIMER_INTERVAL, on_timer, DOOR_TIMER_ID_18);
+        }
+    } else if (value == DOOR_TIMER_ID_27) {
+
+        door_parameter_27 += 0.01;
+        if (door_parameter_27 >= CUBE_SIZE + 0.1) {
+            door_parameter_27 = -1;
+            door_timer_27_active = false;
+        }
+
+        glutPostRedisplay();
+
+        if (door_timer_27_active) {
+            glutTimerFunc(TIMER_INTERVAL, on_timer, DOOR_TIMER_ID_27);
+        }
+    } else if (value == DOOR_TIMER_ID_41) {
+
+        door_parameter_41 += 0.01;
+        if (door_parameter_41 >= CUBE_SIZE + 0.1) {
+            door_parameter_41 = -1;
+            door_timer_41_active = false;
+        }
+
+        glutPostRedisplay();
+
+        if (door_timer_41_active) {
+            glutTimerFunc(TIMER_INTERVAL, on_timer, DOOR_TIMER_ID_41);
+        }
+    } else if (value == DOOR_TIMER_ID_86) {
+
+        door_parameter_86 += 0.01;
+        if (door_parameter_86 >= CUBE_SIZE + 0.1) {
+            door_parameter_86 = -1;
+            door_timer_86_active = false;
+        }
+
+        glutPostRedisplay();
+
+        if (door_timer_86_active) {
+            glutTimerFunc(TIMER_INTERVAL, on_timer, DOOR_TIMER_ID_86);
         }
     } else {
         return;
@@ -734,6 +844,83 @@ bool check_switch_inventory(int i, int j)
     return true;
 }
 
+static void move_door(int i, int j)
+{
+    /* Moving door on position (4, 1) */
+    if (has_key_11 && i == 4 && j == 1) {
+        if (!door_timer_41_active) {
+            door_timer_41_active = true;
+            glutTimerFunc(TIMER_INTERVAL, on_timer, DOOR_TIMER_ID_41);
+        }
+
+        glTranslatef(0, -door_parameter_41, 0);
+    }
+    
+    /* Moving door on position (2, 7) */
+    if (has_key_23 && i == 2 && j == 7) {
+        if (!door_timer_27_active) {
+            door_timer_27_active = true;
+            glutTimerFunc(TIMER_INTERVAL, on_timer, DOOR_TIMER_ID_27);
+        }
+
+        glTranslatef(0, -door_parameter_27, 0);
+    } 
+    
+    /* Moving door on position (8, 6) */
+    if (has_key_71 && i == 8 && j == 6) {
+        if (!door_timer_86_active) {
+            door_timer_86_active = true;
+            glutTimerFunc(TIMER_INTERVAL, on_timer, DOOR_TIMER_ID_86);
+        }
+
+        glTranslatef(0, -door_parameter_86, 0);
+    } 
+    
+    /* Moving door on position (1, 8) */
+    if (has_key_99 && i == 1 && j == 8) {
+        if (!door_timer_18_active) {
+            door_timer_18_active = true;
+            glutTimerFunc(TIMER_INTERVAL, on_timer, DOOR_TIMER_ID_18);
+        }
+
+        glTranslatef(0, -door_parameter_18, 0);
+    }
+}
+
+bool check_key_inventory(int i, int j)
+{
+    /* If the proper key is gathered, key won't be rendered */
+    if (has_key_11 && i == 1 && j == 1) {
+        return false;
+    } else if (has_key_23 && i == 2 && j == 3) {
+        return false;
+    } else if (has_key_71 && i == 7 && j == 1) {
+        return false;
+    } else if (has_key_99 && i == 9 && j == 9) {
+        return false;
+    }
+
+    /* Default: no keys are gathered and they are all rendered */
+    return true;
+}
+
+bool check_door_moved(int i, int j)
+{
+    /* If door was moved, parameter will be -1 and doors won't be rendered */
+    if (door_parameter_18 < 0 && i == 1 && j == 8) {
+        return true;
+    } else if (door_parameter_27 < 0 && i == 2 && j == 7) {
+        return true;
+    } else if (door_parameter_41 < 0 && i == 4 && j == 1) {
+        return true;
+    } else if (door_parameter_86 < 0 && i == 8 && j == 6) {
+        return true;
+    }
+
+    /* Default: doors haven't moved and are all rendered */
+    return false;
+}
+
 static void create_map()
 {
     int i, j;
@@ -799,11 +986,16 @@ static void create_map()
                         glPopMatrix();
 
                         /* Door */
-                        glPushMatrix();
-                            glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
-                            set_diffuse(0.5, 0.2, 0.1, 1);
-                            glutSolidCube(CUBE_SIZE);
-                        glPopMatrix();
+                        if (!check_door_moved(i, j)) {
+                            glPushMatrix();
+                                glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
+
+                                move_door(i, j);
+
+                                set_diffuse(0.5, 0.2, 0.1, 1);
+                                glutSolidCube(CUBE_SIZE);
+                            glPopMatrix();
+                        }
                         break;
 
                     /* Elevator case */
@@ -846,15 +1038,17 @@ static void create_map()
                         glPopMatrix();
 
                         /* Key */
-                        glPushMatrix();
-                            glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
-                            set_diffuse(0.8, 0.8, 0, 1);
+                        if (check_key_inventory(i, j)) {
+                            glPushMatrix();
+                                glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
+                                set_diffuse(0.8, 0.8, 0, 1);
 
-                            glTranslatef(0, CUBE_SIZE / 5 * sin(2 * global_time_parameter * DEG_TO_RAD), 0);
-                            glRotatef(-global_time_parameter * 2, 0, 1, 0);
+                                glTranslatef(0, CUBE_SIZE / 5 * sin(2 * global_time_parameter * DEG_TO_RAD), 0);
+                                glRotatef(-global_time_parameter * 2, 0, 1, 0);
 
-                            create_key();
-                        glPopMatrix();
+                                create_key();
+                            glPopMatrix();
+                        }
                         break;
 
                     /* Switch case */
