@@ -12,10 +12,14 @@
 #define RAD_TO_DEG 180/PI
 #define DEG_TO_RAD PI/180
 
-#define SWITCH_TIMER_ID 50
-#define KEY_TIMER_ID 60
 #define GLOBAL_TIMER_ID 0
 #define TELEPORT_TIMER_ID 1
+#define TIMER_INTERVAL 20
+
+#define ELEVATOR_TIMER_ID_12 12
+#define ELEVATOR_TIMER_ID_58 58
+#define ELEVATOR_TIMER_ID_89 89
+#define ELEVATOR_TIMER_ID_25 25
 
 /* Error-checking function. Used for technical C details */
 #define osAssert(condition, msg) osError(condition, msg)
@@ -25,7 +29,6 @@ void osError(bool condition, const char* msg) {
         exit(EXIT_FAILURE);
     }
 }
-
 
 
 /* Structure that will keep data for every field cube. 
@@ -64,7 +67,7 @@ static float n_x, n_y, n_z;
 static float move_param = 0.02;
 
 /* Material component coeffs that will be updated by support function */
-GLfloat coeffs[] = {0, 0, 0, 1};
+static GLfloat coeffs[] = {0, 0, 0, 1};
 
 /* Main game matrix that will store basic info about every game cube */
 static FieldData** map = NULL;
@@ -74,6 +77,23 @@ static FieldData** map = NULL;
 /* static bool teleport_timer_active = false; */
 static bool global_timer_active = true;
 static float global_time_parameter = 0;
+
+/* Switch flags and parameters: they are connected respectively */
+static bool has_switch_98 = false;
+static float elevator_parameter_12 = 0;
+static bool elevator_timer_12_active = false;
+
+static bool has_switch_44 = false;
+static float elevator_parameter_58 = 0;
+static bool elevator_timer_58_active = false;
+
+static bool has_switch_73 = false;
+static float elevator_parameter_89 = 0;
+static bool elevator_timer_89_active = false;
+
+static bool has_switch_77 = false;
+static float elevator_parameter_25 = 0;
+static bool elevator_timer_25_active = false;
 
 /*Basic glut callback functions declarations*/
 static void on_keyboard(unsigned char key, int x, int y);
@@ -120,6 +140,9 @@ static void create_key();
 
 /* Creates teleport with the given color */
 static void create_teleport(float x, float y, float z, char color);
+
+/* Moves elevators if their connected switches are gathered */
+static void move_elevator(int i, int j, float e_height);
 
 int main(int argc, char** argv)
 {
@@ -195,6 +218,26 @@ static void on_keyboard(unsigned char key, int x, int y)
             exit(0);
             break;
 
+        case '1':
+            has_switch_98 = true;
+            glutPostRedisplay();
+            break;
+
+        case '2':
+            has_switch_44 = true;
+            glutPostRedisplay();
+            break;
+
+        case '3':
+            has_switch_73 = true;
+            /* glutPostRedisplay(); */
+            break;
+
+        case '4':
+            has_switch_77 = true;
+            glutPostRedisplay();
+            break;
+
         case 'z':
         case 'Z':
             if (!global_timer_active) {
@@ -216,10 +259,26 @@ static void on_keyboard(unsigned char key, int x, int y)
             eye_y = 8*CUBE_SIZE;
             eye_z = 0;
 
+            /* Reseting all parameters */
             global_time_parameter = 0;
+
+            elevator_parameter_12 = 0;
+            elevator_parameter_25 = 0;
+            elevator_parameter_58 = 0;
+            elevator_parameter_89 = 0;
+
+            elevator_timer_12_active = false;
+            elevator_timer_25_active = false;
+            elevator_timer_58_active = false;
+            elevator_timer_89_active = false;
+
+            has_switch_44 = false;
+            has_switch_73 = false;
+            has_switch_77 = false;
+            has_switch_98 = false;
+
             glutPostRedisplay();
             break;
-
 
         case 'w':
         case 'W':
@@ -249,16 +308,53 @@ static void on_keyboard(unsigned char key, int x, int y)
 
 static void on_timer(int value)
 {
-    if (value != GLOBAL_TIMER_ID) {
+    if (value == GLOBAL_TIMER_ID) {
+
+        global_time_parameter += 1;
+
+        glutPostRedisplay();
+
+        if (global_timer_active) {
+            glutTimerFunc(TIMER_INTERVAL, on_timer, GLOBAL_TIMER_ID);
+        }
+    } else if (value == ELEVATOR_TIMER_ID_12) {
+
+        elevator_parameter_12 += PI/180;
+
+        glutPostRedisplay();
+
+        if (elevator_timer_12_active) {
+            glutTimerFunc(TIMER_INTERVAL, on_timer, ELEVATOR_TIMER_ID_12);
+        }
+    } else if (value == ELEVATOR_TIMER_ID_58) {
+
+        elevator_parameter_58 += PI/180;
+
+        glutPostRedisplay();
+
+        if (elevator_parameter_58) {
+            glutTimerFunc(TIMER_INTERVAL, on_timer, ELEVATOR_TIMER_ID_58);
+        }
+    } else if (value == ELEVATOR_TIMER_ID_89) {
+
+        elevator_parameter_89 += PI/180;
+
+        glutPostRedisplay();
+
+        if (elevator_parameter_89) {
+            glutTimerFunc(TIMER_INTERVAL, on_timer, ELEVATOR_TIMER_ID_89);
+        }
+    } else if (value == ELEVATOR_TIMER_ID_25) {
+
+        elevator_parameter_25 += PI/180;
+
+        glutPostRedisplay();
+
+        if (elevator_parameter_25) {
+            glutTimerFunc(TIMER_INTERVAL, on_timer, ELEVATOR_TIMER_ID_25);
+        }
+    } else {
         return;
-    }
-
-    global_time_parameter += 1;
-
-    glutPostRedisplay();
-
-    if (global_time_parameter) {
-        glutTimerFunc(20, on_timer, GLOBAL_TIMER_ID);
     }
 }
 
@@ -474,7 +570,8 @@ static void create_key()
     glPopMatrix();
 }
 
-void set_vector3f(GLfloat* vector, float r, float g, float b) {
+void set_vector3f(GLfloat* vector, float r, float g, float b) 
+{
     vector[0] = r;
     vector[1] = g;
     vector[2] = b;
@@ -483,8 +580,10 @@ void set_vector3f(GLfloat* vector, float r, float g, float b) {
 static void create_teleport(float x, float y, float z, char color)
 {
     /* Reminder: (x,y,z) are the coordinates of the center of the cube */
-    float phi;
     float r = CUBE_SIZE / 2 - 0.05;
+    float angle_scale = 1.2;
+    float line_height_scale = 1.3;
+    float phi;
 
     GLfloat inner[3];
     GLfloat outer[3];
@@ -546,16 +645,93 @@ static void create_teleport(float x, float y, float z, char color)
 
     for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
         glBegin(GL_LINES);
-            glVertex3f(x  + r * cos(phi * 1.2 /* + teleport_time */), 
+            glVertex3f(x  + r * cos(phi * angle_scale), 
                        y, 
-                       z + r * sin(phi * 1.2 /* + teleport_time */));
-            glVertex3f(x + r * cos(phi * 1.2 /* + teleport_time */), 
-                       y + CUBE_SIZE/1.3, 
-                       z + r * sin(phi * 1.2 /* + teleport_time */));
+                       z + r * sin(phi * angle_scale));
+            glVertex3f(x + r * cos(phi * angle_scale), 
+                       y + CUBE_SIZE / line_height_scale, 
+                       z + r * sin(phi * angle_scale));
         glEnd();        
     }
 
     glEnable(GL_LIGHTING);
+}
+
+static void move_elevator(int i, int j, float e_height)
+{
+    /* Amplitude - defines how far will elevator move */
+    float amp = 0;
+    /* Move parameter e [0, 1] and changes with time */
+    float move_param = 0;
+
+    /* Moving elevator on position (1, 2) */
+    if (has_switch_98 && i == 1 && j == 2) {
+        if (!elevator_timer_12_active) {
+            elevator_timer_12_active = true;
+            glutTimerFunc(TIMER_INTERVAL, on_timer, ELEVATOR_TIMER_ID_12);
+        }
+
+        amp = (1 - e_height + EPS) * CUBE_SIZE;
+        move_param = (1 + sin(elevator_parameter_12 - PI/2)) / 2;
+
+        glTranslatef(0, amp * move_param, 0);
+    }
+
+    /* Moving elevator on position (5, 8) */
+    if (has_switch_44 && i == 5 && j == 8) {
+        if (!elevator_timer_58_active) {
+            elevator_timer_58_active = true;
+            glutTimerFunc(TIMER_INTERVAL, on_timer, ELEVATOR_TIMER_ID_58);
+        }
+
+        amp = (1 - e_height + EPS) * CUBE_SIZE;
+        move_param = (1 + sin(elevator_parameter_58 - PI/2)) / 2;
+
+        glTranslatef(0, amp * move_param, 0);
+    }
+
+    /* Moving elevator on position (8, 9) */
+    if (has_switch_73 && i == 8 && j == 9) {
+        if (!elevator_timer_89_active) {
+            elevator_timer_89_active = true;
+            glutTimerFunc(TIMER_INTERVAL, on_timer, ELEVATOR_TIMER_ID_89);
+        }
+
+        amp = (1 - e_height + EPS) * CUBE_SIZE;
+        move_param = (1 + sin(elevator_parameter_89 - PI/2)) / 2;
+
+        glTranslatef(0, amp * move_param, 0);
+    }
+
+    /* Moving elevator on position (2, 5) */
+    if (has_switch_77 && i == 2 && j == 5) {
+        if (!elevator_timer_25_active) {
+            elevator_timer_25_active = true;
+            glutTimerFunc(TIMER_INTERVAL, on_timer, ELEVATOR_TIMER_ID_25);
+        }
+
+        amp = (2 - e_height + EPS) * CUBE_SIZE;
+        move_param = (1 + sin(elevator_parameter_25 - PI/2)) / 2;
+
+        glTranslatef(0, amp * move_param, 0);
+    }
+}
+
+bool check_switch_inventory(int i, int j)
+{
+    /* If the proper switch is gathered, switch won't be rendered */
+    if (has_switch_44 && i == 4 && j == 4) {
+        return false;
+    } else if (has_switch_73 && i == 7 && j == 3) {
+        return false;
+    } else if (has_switch_77 && i == 7 && j == 7) {
+        return false;
+    } else if (has_switch_98 && i == 9 && j == 8) {
+        return false;
+    }
+
+    /* Default: no switches are gathered and they are all rendered */
+    return true;
 }
 
 static void create_map()
@@ -563,12 +739,12 @@ static void create_map()
     int i, j;
 
     float switch_height = 0.4;
-    float elevator_height = 0.2;
+    float elevator_height = 0.15;
 
     /* Special factor that fixes the elevator position since scaling
      * will cause the elevator to float in space */
-    float elevator_scale_move_factor = 0.25;
-   
+    float e_scale_move_factor = 2 * elevator_height - 4 * EPS;
+
     glPushMatrix();
 
         glTranslatef(CUBE_SIZE / 2, - CUBE_SIZE / 2, - CUBE_SIZE / 2);
@@ -578,7 +754,7 @@ static void create_map()
 
                 /* x and z coordinates of the CENTER of the cube */
                 float x = j*CUBE_SIZE;
-                float z = -(map_rows - 1 - i)*CUBE_SIZE;
+                float z = -(map_rows - 1 - i) * CUBE_SIZE;
 
                 switch (map[i][j].type) {
                     /* Wall case */
@@ -624,7 +800,7 @@ static void create_map()
 
                         /* Door */
                         glPushMatrix();
-                            glTranslatef(x, map[i][j].height*CUBE_SIZE, z);
+                            glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
                             set_diffuse(0.5, 0.2, 0.1, 1);
                             glutSolidCube(CUBE_SIZE);
                         glPopMatrix();
@@ -645,8 +821,11 @@ static void create_map()
 
                         /* Elevator */
                         glPushMatrix();
-                            glTranslatef(x, map[i][j].height*CUBE_SIZE, z);
-                            glTranslatef(0, -elevator_scale_move_factor, 0);
+                            glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
+                            glTranslatef(0, -e_scale_move_factor, 0);
+
+                            move_elevator(i, j, elevator_height);
+
                             glScalef(1, elevator_height, 1);
                             set_diffuse(0.7, 0.7, 0.4, 1);
                             glutSolidCube(CUBE_SIZE);
@@ -668,10 +847,10 @@ static void create_map()
 
                         /* Key */
                         glPushMatrix();
-                            glTranslatef(x, map[i][j].height*CUBE_SIZE, z);
+                            glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
                             set_diffuse(0.8, 0.8, 0, 1);
 
-                            glTranslatef(0, CUBE_SIZE/5 * sin(2 * global_time_parameter * DEG_TO_RAD), 0);
+                            glTranslatef(0, CUBE_SIZE / 5 * sin(2 * global_time_parameter * DEG_TO_RAD), 0);
                             glRotatef(-global_time_parameter * 2, 0, 1, 0);
 
                             create_key();
@@ -692,20 +871,22 @@ static void create_map()
                         glPopMatrix();
 
                         /* Switch */
-                        glPushMatrix();
-                            glTranslatef(x, map[i][j].height*CUBE_SIZE, z);
+                        if (check_switch_inventory(i, j)) {
+                            glPushMatrix();
+                                glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
 
-                            /* glRotatef(-30, 0, 0, 1) will slightly move the switch
-                             * to the right; we fix it by moving slightly to the left.
-                             * Also, -CUBE_SIZE/2 is to lower the floating effect */
-                            glTranslatef(0, -CUBE_SIZE/2, 0);
+                                /* glRotatef(-30, 0, 0, 1) will slightly move the switch
+                                * to the right; we fix it by moving slightly to the left.
+                                * Also, -CUBE_SIZE/2 is to lower the floating effect */
+                                glTranslatef(0, -CUBE_SIZE / 2, 0);
 
-                            glRotatef(global_time_parameter * 2, 0, 1, 0);
+                                glRotatef(global_time_parameter * 2, 0, 1, 0);
 
-                            glRotatef(-25, 0, 0, 1);
-                            set_diffuse(0.5, 0.5, 0.7, 1);
-                            draw_cylinder(0.035, switch_height);
-                        glPopMatrix();
+                                glRotatef(-25, 0, 0, 1);
+                                set_diffuse(0.5, 0.5, 0.7, 1);
+                                draw_cylinder(0.035, switch_height);
+                            glPopMatrix();
+                        }
                         break;
 
                     /* Teleport case */
@@ -738,19 +919,6 @@ static void create_map()
     glPopMatrix();
 
 }
-/*
-static void reset_material()
-{
-    GLfloat ambient_coeffs[] = {0.2, 0.2, 0.2, 1};
-    GLfloat diffuse_coeffs[] = {0.5, 0.5, 0.5, 1};
-    GLfloat specular_coeffs[] = {0.3, 0.3, 0.3, 1};
-    GLfloat shininess = 30;
-    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient_coeffs);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse_coeffs);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular_coeffs);
-    glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
-}
-*/
 
 static void on_display(void)
 {
