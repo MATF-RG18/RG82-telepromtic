@@ -691,6 +691,7 @@ static void create_teleport(float x, float y, float z, char color)
 {
     /* Reminder: (x,y,z) are the coordinates of the center of the cube */
     float r = CUBE_SIZE / 2 - 0.05;
+    float r_in = CUBE_SIZE / 2 - 0.05 - 0.05;
     float angle_scale = 1.2;
     float line_height_scale = 1.3;
     float phi;
@@ -755,12 +756,28 @@ static void create_teleport(float x, float y, float z, char color)
 
     for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
         glBegin(GL_LINES);
-            glVertex3f(x  + r * cos(phi * angle_scale), 
+        /* dodati * global_time_parameter * DEG_TO_RAD / 3 */
+            glVertex3f(x  + r * cos(phi * angle_scale * global_time_parameter * DEG_TO_RAD / 3), 
                        y, 
-                       z + r * sin(phi * angle_scale));
-            glVertex3f(x + r * cos(phi * angle_scale), 
+                       z + r * sin(phi * angle_scale * global_time_parameter * DEG_TO_RAD / 3));
+            glVertex3f(x + r * cos(phi * angle_scale * global_time_parameter * DEG_TO_RAD / 3), 
                        y + CUBE_SIZE / line_height_scale, 
-                       z + r * sin(phi * angle_scale));
+                       z + r * sin(phi * angle_scale * global_time_parameter * DEG_TO_RAD / 3));
+        glEnd();        
+    }
+
+    glLineWidth(1.6);
+    glColor3fv(outer);
+
+    for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
+        glBegin(GL_LINES);
+        /* dodati * global_time_parameter * DEG_TO_RAD / 3 */
+            glVertex3f(x  + r_in * sin(phi * angle_scale * global_time_parameter * DEG_TO_RAD /2), 
+                       y, 
+                       z + r_in * cos(phi * angle_scale * global_time_parameter * DEG_TO_RAD /2));
+            glVertex3f(x + r_in * sin(phi * angle_scale * global_time_parameter * DEG_TO_RAD /2), 
+                       y + CUBE_SIZE / line_height_scale, 
+                       z + r_in * cos(phi * angle_scale * global_time_parameter * DEG_TO_RAD /2));
         glEnd();        
     }
 
