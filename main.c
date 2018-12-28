@@ -24,6 +24,8 @@ void osError(bool condition, const char* msg) {
 #define GLOBAL_TIMER_ID 0
 #define TIMER_INTERVAL 20
 
+#define TELEPORT_TIMER_ID 1
+
 #define ELEVATOR_TIMER_ID_12 12
 #define ELEVATOR_TIMER_ID_58 58
 #define ELEVATOR_TIMER_ID_89 89
@@ -75,11 +77,13 @@ static GLfloat coeffs[] = {0, 0, 0, 1};
 /* Main game matrix that will store basic info about every game cube */
 static FieldData** map = NULL;
 
-/* Teleport time parameter and active indicator*/
-/* static float teleport_time = 0; */
-/* static bool teleport_timer_active = false; */
+/* Global timer flag and parameter: global timer is always active */
 static bool global_timer_active = true;
 static float global_time_parameter = 0;
+
+/* Teleport timer flag and parameter: used for teleport animation */
+static float teleport_parameter = 0;
+static bool teleport_timer_active = true;
 
 /* Switch/Elevator flags and parameters: they are connected respectively */
 static bool has_switch_98 = false;
@@ -222,7 +226,8 @@ int main(int argc, char** argv)
     store_map_data();
     store_map_connections();
 
-    glutTimerFunc(20, on_timer, GLOBAL_TIMER_ID);
+    glutTimerFunc(TIMER_INTERVAL, on_timer, GLOBAL_TIMER_ID);
+    glutTimerFunc(TIMER_INTERVAL, on_timer, TELEPORT_TIMER_ID);
 
     /* Entering OpenGL main loop */
     glutMainLoop();
@@ -374,6 +379,15 @@ static void on_timer(int value)
 
         if (global_timer_active) {
             glutTimerFunc(TIMER_INTERVAL, on_timer, GLOBAL_TIMER_ID);
+        }
+    } else if (value == TELEPORT_TIMER_ID) {
+
+        teleport_parameter += PI/90;
+
+        glutPostRedisplay();
+
+        if (teleport_timer_active) {
+            glutTimerFunc(TIMER_INTERVAL, on_timer, TELEPORT_TIMER_ID);
         }
     } else if (value == ELEVATOR_TIMER_ID_12) {
 
@@ -691,8 +705,8 @@ static void create_teleport(float x, float y, float z, char color)
 {
     /* Reminder: (x,y,z) are the coordinates of the center of the cube */
     float r = CUBE_SIZE / 2 - 0.05;
-    float r_in = CUBE_SIZE / 2 - 0.05 - 0.05;
-    float angle_scale = 1.2;
+    float r_in = CUBE_SIZE / 2 - 0.1 - 0.02;
+    float angle_scale = 2.1;
     float line_height_scale = 1.3;
     float phi;
 
@@ -740,6 +754,7 @@ static void create_teleport(float x, float y, float z, char color)
 
     glDisable(GL_LIGHTING);
 
+    /* Floor gradiental circle */
     glBegin(GL_TRIANGLE_FAN);
 
         glColor3fv(inner);
@@ -751,35 +766,34 @@ static void create_teleport(float x, float y, float z, char color)
         }
     glEnd();
 
-    glLineWidth(1.8);
-    glColor3fv(outer);
-
-    for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
-        glBegin(GL_LINES);
-        /* dodati * global_time_parameter * DEG_TO_RAD / 3 */
-            glVertex3f(x  + r * cos(phi * angle_scale * global_time_parameter * DEG_TO_RAD / 3), 
-                       y, 
-                       z + r * sin(phi * angle_scale * global_time_parameter * DEG_TO_RAD / 3));
-            glVertex3f(x + r * cos(phi * angle_scale * global_time_parameter * DEG_TO_RAD / 3), 
-                       y + CUBE_SIZE / line_height_scale, 
-                       z + r * sin(phi * angle_scale * global_time_parameter * DEG_TO_RAD / 3));
-        glEnd();        
-    }
-
+    /* Inner rotating lines */
     glLineWidth(1.6);
-    glColor3fv(outer);
+    glColor3fv(inner);
 
+    glRotatef(0.5 * teleport_parameter * RAD_TO_DEG, 0, 1, 0);
     for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
         glBegin(GL_LINES);
-        /* dodati * global_time_parameter * DEG_TO_RAD / 3 */
-            glVertex3f(x  + r_in * sin(phi * angle_scale * global_time_parameter * DEG_TO_RAD /2), 
-                       y, 
-                       z + r_in * cos(phi * angle_scale * global_time_parameter * DEG_TO_RAD /2));
-            glVertex3f(x + r_in * sin(phi * angle_scale * global_time_parameter * DEG_TO_RAD /2), 
-                       y + CUBE_SIZE / line_height_scale, 
-                       z + r_in * cos(phi * angle_scale * global_time_parameter * DEG_TO_RAD /2));
+            glVertex3f(x  + r_in * sin(angle_scale*phi), 
+                    y, 
+                    z + r_in * cos(angle_scale*phi));
+            glVertex3f(x + r_in * sin(angle_scale*phi), 
+                    y + CUBE_SIZE / line_height_scale, 
+                    z + r_in * cos(angle_scale*phi));
         glEnd();        
     }
+
+    /* Outer cylinders */
+    glColor3fv(outer);
+    float v;
+
+    glPushMatrix();
+        glRotatef(global_time_parameter, 0, 1, 0);
+        for (v = 0.05; v <= CUBE_SIZE/2; v += 0.025) {
+            glTranslatef(0, 0.05, 0);
+            glTranslatef(0, 0.005 * sin(teleport_parameter), 0);
+            draw_cylinder(r, 0.025);
+        }
+    glPopMatrix();
 
     glEnable(GL_LIGHTING);
 }
