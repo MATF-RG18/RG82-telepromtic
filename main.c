@@ -161,9 +161,6 @@ static void other_initialize();
 /* Support function that sets diffuse coeffs in a global vector */
 static void set_diffuse(float r, float g, float b, float a);
 
-/* Support function that resets default material lighting settings */
-/* static void reset_material(); */
-
 /* Support function that draws coordinate system */
 static void draw_axis();
 
@@ -385,12 +382,14 @@ static void on_keyboard(unsigned char key, int x, int y)
 
 static void on_mouse_passive(int x, int y)
 {
+    /* First mouse register */
     if (first_mouse) {
         last_x = x;
         last_y = y;
         first_mouse = false;
     }
 
+    /* Calculating mouse move */
     float x_offset = x - last_x;
     float y_offset = last_y - y;
     last_x = x;
@@ -400,9 +399,11 @@ static void on_mouse_passive(int x, int y)
     x_offset *= sensitivity;
     y_offset *= sensitivity;
 
+    /* Calculating Euler yaw (phi) and pitch (theta) angles */
     phi += x_offset;
     theta += y_offset;
 
+    /* Fixing camera rotation to 'sky' and 'floor' */
     if (theta >= 89) {
         theta = 89;
     }
@@ -410,6 +411,7 @@ static void on_mouse_passive(int x, int y)
         theta = -89;
     }
 
+    /* Calculating camera direction */
     vec3 front;
     float front_x = cos(phi * DEG_TO_RAD) * cos(theta * DEG_TO_RAD);
     float front_y = sin(theta * DEG_TO_RAD);
@@ -558,12 +560,18 @@ static void glut_initialize()
 
 static void other_initialize()
 {
+    /* Setting up camera position and target */
+    glm_vec3((vec3){0.0f, 8*CUBE_SIZE, 0.0f}, camera_pos);
+    glm_vec3((vec3){1.0f, 0.0f, -1.0f}, camera_front);
+
+    /* Scanning map dimensions */
     FILE* f = fopen(map_dimensions_file, "r");
     osAssert(f != NULL, "Error opening file \"map_dimensions.txt\"\n");
 
     fscanf(f, "%d %d", &map_rows, &map_cols);
     fclose(f);
 
+    /* Seeding time */
     srand(time(NULL));
 }
 
@@ -736,11 +744,12 @@ static void create_key()
     glPopMatrix();
 }
 
-void set_vector3f(GLfloat* vector, float r, float g, float b) 
+void set_vector4f(GLfloat* vector, float r, float g, float b, float a) 
 {
     vector[0] = r;
     vector[1] = g;
     vector[2] = b;
+    vector[3] = a;
 }
 
 static void create_teleport(float x, float y, float z, char color)
@@ -752,45 +761,55 @@ static void create_teleport(float x, float y, float z, char color)
     float line_height_scale = 1.3;
     float phi;
 
-    GLfloat inner[3];
-    GLfloat outer[3];
+    GLfloat inner[4];
+    GLfloat outer[4];
+    GLfloat lines[4];
 
     switch (color) {
         case 'b':   
-            set_vector3f(inner, 0, 0.3, 1);             
-            set_vector3f(outer, 0, 0.15, 0.9); 
+            set_vector4f(inner, 0, 0.3, 1, 1);             
+            set_vector4f(outer, 0, 0.15, 0.9, 1); 
+            set_vector4f(lines, 0, 0.3, 1, 0.9); 
             break;
         case 'r':   
-            set_vector3f(inner, 1, 0.1, 0.1);
-            set_vector3f(outer, 0.85, 0, 0);
+            set_vector4f(inner, 1, 0.1, 0.1, 1);
+            set_vector4f(outer, 0.85, 0, 0, 1);
+            set_vector4f(lines, 1, 0.1, 0.1, 0.9);
             break;
         case 'g':   
-            set_vector3f(inner, 0.1, 0.7, 0.1);
-            set_vector3f(outer, 0, 0.55, 0);
+            set_vector4f(inner, 0.1, 0.7, 0.1, 1);
+            set_vector4f(outer, 0, 0.55, 0, 1);
+            set_vector4f(lines, 0.1, 0.7, 0.1, 0.9);
             break;
         case 'y':   
-            set_vector3f(inner, 0.9, 0.55, 0);
-            set_vector3f(outer, 1, 0.85, 0.1);
+            set_vector4f(inner, 0.9, 0.55, 0, 1);
+            set_vector4f(outer, 1, 0.85, 0.1, 1);
+            set_vector4f(lines, 0.9, 0.55, 0, 0.9);
             break;
         case 'o':   
-            set_vector3f(inner, 1, 0.6, 0.1);
-            set_vector3f(outer, 0.9, 0.4, 0);
+            set_vector4f(inner, 1, 0.6, 0.1, 1);
+            set_vector4f(outer, 0.9, 0.4, 0, 1);
+            set_vector4f(lines, 1, 0.6, 0.1, 0.9);
             break;
         case 'm':   
-            set_vector3f(inner, 0.85, 0.3, 0.6); 
-            set_vector3f(outer, 1, 0.4, 0.75);
+            set_vector4f(inner, 0.85, 0.3, 0.6, 1); 
+            set_vector4f(outer, 1, 0.4, 0.75, 1);
+            set_vector4f(lines, 0.85, 0.3, 0.6, 0.9);
             break;
         case 'p':   
-            set_vector3f(inner, 0.4, 0.1, 0.7);
-            set_vector3f(outer, 0.3, 0, 0.55);
+            set_vector4f(inner, 0.4, 0.1, 0.7, 1);
+            set_vector4f(outer, 0.3, 0, 0.55, 1);
+            set_vector4f(lines, 0.4, 0.1, 0.7, 0.9);
             break;
         case 'c':   
-            set_vector3f(inner, 0, 0.5, 0.85); 
-            set_vector3f(outer, 0.1, 0.75, 1); 
+            set_vector4f(inner, 0, 0.5, 0.85, 1); 
+            set_vector4f(outer, 0.1, 0.75, 1, 1);
+            set_vector4f(lines, 0, 0.5, 0.85, 0.9);
             break;
         default:    
-            set_vector3f(inner, 1, 1, 1); 
-            set_vector3f(outer, 0.9, 0.9, 0.9); 
+            set_vector4f(inner, 1, 1, 1, 1); 
+            set_vector4f(outer, 0.8, 0.8, 0.8, 1);
+            set_vector4f(lines, 1, 1, 1, 0.9);
             break;
     }
 
@@ -799,18 +818,18 @@ static void create_teleport(float x, float y, float z, char color)
     /* Floor gradiental circle */
     glBegin(GL_TRIANGLE_FAN);
 
-        glColor3fv(inner);
+        glColor4fv(inner);
         glVertex3f(x, y, z);
 
         for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
-            glColor3fv(outer);
+            glColor4fv(outer);
             glVertex3f(x + r * cos(phi), y, z + r * sin(phi));
         }
     glEnd();
 
     /* Inner rotating lines */
     glLineWidth(1.6);
-    glColor3fv(inner);
+    glColor4fv(lines);
 
     glRotatef(0.5 * teleport_parameter * RAD_TO_DEG, 0, 1, 0);
     for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
@@ -825,7 +844,8 @@ static void create_teleport(float x, float y, float z, char color)
     }
 
     /* Outer cylinders */
-    glColor3fv(outer);
+    glColor4fv(outer);
+
     float v;
 
     glPushMatrix();
