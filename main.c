@@ -1,4 +1,5 @@
 #include <GL/glut.h>
+#include <cglm/cglm.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -37,11 +38,10 @@ void osError(bool condition, const char* msg) {
 #define DOOR_TIMER_ID_86 86
 
 /* Structure that will keep data for every field cube. 
- * 1) type can be: 'w' - wall, 'l' - lava, 't' - teleport, 'd' - door, 'e' - elevator,
+ * 1) type can be: 'w' - wall, 'l' - lava, 'd' - door, 'e' - elevator,
  *    'k' - key, 's' - switch, 'X' - goal, '@' - player starting position
  * 2) color can be: 'r' - red, 'g' - green, 'b' - blue, 'y' - yellow, 'o' - orange,
- *    'p' - purple, 'c' - cyan, 'm' - magenta, 'z' - brown, 'q' - grey (we want all
- *     keys/doors to be brown and switches/elevators to be grey, to avoid too much colors)
+ *    'p' - purple, 'c' - cyan, 'm' - magenta. In case of teleports this is also the type
  * 3) to_row and to_col will store indexes in map matrix for teleport-teleport, 
  *    key-door and switch/elevator that are connected
  * 4) height stores height of the cube: 0 height means floor */
@@ -62,14 +62,6 @@ const static char map_dimensions_file[MAX_FILE_NAME] = "map_dimensions.txt";
 const static char map_connections_file[MAX_FILE_NAME] = "map_connections.txt";
 /* Every part of the field is made of cube of fixed size */
 const static float CUBE_SIZE = 0.6;
-
-/* Camera position, look direction and normal vector*/
-static float eye_x, eye_y, eye_z;
-static float to_x, to_y, to_z;
-static float n_x, n_y, n_z;
-
-/* Moving parameter */
-static float move_param = 0.02;
 
 /* Material component coeffs that will be updated by support function */
 static GLfloat coeffs[] = {0, 0, 0, 1};
@@ -119,8 +111,32 @@ static bool has_key_71 = false;
 static float door_parameter_86 = 0;
 static bool door_timer_86_active = false;
 
+/* Camera position, target and up vectors */
+static vec3 camera_pos = (vec3){0.0f, 0.0f, 3.0f};
+static vec3 camera_front = (vec3){0.0f, 0.0f, -1.0f};
+static vec3 camera_up = (vec3){0.0f, 1.0f, 0.0f};
+
+/* Camera direction and right vectors */
+static vec3 camera_direction;
+static vec3 camera_right;
+
+/* Camera speed (player movement speed) */
+static float camera_speed = 0.05f;
+
+/* Last (x, y) coordinates of mouse pointer registered on window */
+static float last_x = 400;
+static float last_y = 300;
+
+/* Flag - false after mouse is catched for the first time */
+static bool first_mouse = true;
+
+/* Pitch and Yaw angles used for camera rotation */
+static float theta = 0; /* [-89, 89] deg */
+static float phi = 0;   /* [0, 180) deg */
+
 /*Basic glut callback functions declarations*/
 static void on_keyboard(unsigned char key, int x, int y);
+static void on_mouse_passive(int x, int y);
 static void on_timer(int value);
 static void on_reshape(int width, int height);
 static void on_display(void);
@@ -171,6 +187,7 @@ static void move_elevator(int i, int j, float e_height);
 /* Moves doors if their connected keys are gathered */
 static void move_door(int i, int j);
 
+
 int main(int argc, char** argv)
 {
     /* Light parameters */
@@ -196,6 +213,7 @@ int main(int argc, char** argv)
 
     /* Registrating glut callback functions */
     glutKeyboardFunc(on_keyboard);
+    glutPassiveMotionFunc(on_mouse_passive);
     glutReshapeFunc(on_reshape);
     glutDisplayFunc(on_display);
 
@@ -302,11 +320,6 @@ static void on_keyboard(unsigned char key, int x, int y)
 
         case 'r':
         case 'R':
-            /* Also reseting camera position */
-            eye_x = 0;
-            eye_y = 8*CUBE_SIZE;
-            eye_z = 0;
-
             /* Reseting all parameters */
             global_time_parameter = 0;
 
@@ -345,28 +358,67 @@ static void on_keyboard(unsigned char key, int x, int y)
 
         case 'w':
         case 'W':
-            eye_z -= move_param;
+            glm_vec3_muladds(camera_front, camera_speed, camera_pos);
             glutPostRedisplay();
             break;
 
         case 's':
         case 'S':
-            eye_z += move_param;
+            glm_vec3_muladds(camera_front, -camera_speed, camera_pos);
             glutPostRedisplay();
             break;
 
         case 'a':
         case 'A':
-            eye_x -= move_param;
+            glm_vec3_muladds(camera_right, -camera_speed, camera_pos);
             glutPostRedisplay();
+            break;
             break;
 
         case 'd':
         case 'D':
-            eye_x += move_param;
+            glm_vec3_muladds(camera_right, camera_speed, camera_pos);
             glutPostRedisplay();
             break;
     }
+}
+
+static void on_mouse_passive(int x, int y)
+{
+    if (first_mouse) {
+        last_x = x;
+        last_y = y;
+        first_mouse = false;
+    }
+
+    float x_offset = x - last_x;
+    float y_offset = last_y - y;
+    last_x = x;
+    last_y = y;
+
+    float sensitivity = 0.5f;
+    x_offset *= sensitivity;
+    y_offset *= sensitivity;
+
+    phi += x_offset;
+    theta += y_offset;
+
+    if (theta >= 89) {
+        theta = 89;
+    }
+    if (theta <= -89) {
+        theta = -89;
+    }
+
+    vec3 front;
+    float front_x = cos(phi * DEG_TO_RAD) * cos(theta * DEG_TO_RAD);
+    float front_y = sin(theta * DEG_TO_RAD);
+    float front_z = sin(phi * DEG_TO_RAD) * cos(theta * DEG_TO_RAD);
+
+    glm_vec3((vec3){front_x, front_y, front_z}, front);
+    glm_normalize(front);
+
+    glm_vec3_copy(front, camera_front);
 }
 
 static void on_timer(int value)
@@ -506,16 +558,6 @@ static void glut_initialize()
 
 static void other_initialize()
 {
-    eye_x = 0;
-    eye_y = 8*CUBE_SIZE;
-    eye_z = 0;
-    to_x = 5*CUBE_SIZE;
-    to_y = 2*CUBE_SIZE;
-    to_z = -5*CUBE_SIZE;
-    n_x = 0;
-    n_y = 1;
-    n_z = 0;
-
     FILE* f = fopen(map_dimensions_file, "r");
     osAssert(f != NULL, "Error opening file \"map_dimensions.txt\"\n");
 
@@ -1152,13 +1194,17 @@ static void on_display(void)
     /* Clearing the previous window appearance */
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    /* Calculating right vector and directional vector */
+    glm_vec3_crossn(camera_front, camera_up, camera_right);
+    glm_vec3_add(camera_pos, camera_front, camera_direction);
+
     /* Cammera settings */
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    gluLookAt(eye_x, eye_y, eye_z,
-              to_x, to_y, to_z,
-              n_x, n_y, n_z);
+    gluLookAt(camera_pos[0], camera_pos[1], camera_pos[2],
+              camera_direction[0], camera_direction[1], camera_direction[2],
+              camera_up[0], camera_up[1], camera_up[2]);
 
     draw_axis();
 
