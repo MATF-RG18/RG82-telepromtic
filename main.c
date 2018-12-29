@@ -843,17 +843,18 @@ static void create_teleport(float x, float y, float z, char color)
         glEnd();        
     }
 
-    /* Outer cylinders */
+    /* Outer rings */
     glColor4fv(outer);
 
     float v;
+    float ring_height = 0.025;
 
     glPushMatrix();
-        glRotatef(global_time_parameter, 0, 1, 0);
-        for (v = 0.05; v <= CUBE_SIZE/2; v += 0.025) {
-            glTranslatef(0, 0.05, 0);
+        glRotatef(-global_time_parameter, 0, 1, 0);
+        for (v = 0.05; v <= CUBE_SIZE/2.2; v += 0.035) {
+            glTranslatef(0, 0.07, 0);
             glTranslatef(0, 0.005 * sin(teleport_parameter), 0);
-            draw_cylinder(r, 0.025);
+            draw_cylinder(r, ring_height);
         }
     glPopMatrix();
 
