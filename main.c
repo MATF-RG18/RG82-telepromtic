@@ -60,8 +60,10 @@ const static char map_input_file[MAX_FILE_NAME] = "map.txt";
 const static char map_dimensions_file[MAX_FILE_NAME] = "map_dimensions.txt";
 /* Map connections and teleport colors file */
 const static char map_connections_file[MAX_FILE_NAME] = "map_connections.txt";
-/* Every part of the field is made of cube of fixed size */
-const static float CUBE_SIZE = 0.6;
+
+/* Every part of the field is made of cube of fixed size.
+ * All other objects' size are relative to this size */
+const static float CUBE_SIZE = 3.6;
 
 /* Material component coeffs that will be updated by support function */
 static GLfloat coeffs[] = {0, 0, 0, 1};
@@ -121,7 +123,7 @@ static vec3 camera_direction;
 static vec3 camera_right;
 
 /* Camera speed (player movement speed) */
-static float camera_speed = 0.05f;
+static float camera_speed = 0.2f;
 
 /* Last (x, y) coordinates of mouse pointer registered on window */
 static float last_x = 400;
@@ -172,8 +174,11 @@ static void draw_cylinder(float r, float h);
  * Wall is constructed of height cubes piled on each other. */
 static void create_wall(float cube_size, int height);
 
-/* Creates keys on the map */
+/* Creates key of fixed size */
 static void create_key();
+
+/* Creates switch of fixed size */
+static void create_switch();
 
 /* Creates teleport with the given color */
 static void create_teleport(float x, float y, float z, char color);
@@ -382,6 +387,8 @@ static void on_keyboard(unsigned char key, int x, int y)
 
 static void on_mouse_passive(int x, int y)
 {
+    /* NOTE: code taken from https://learnopengl.com/Getting-started/Camera */
+
     /* First mouse register */
     if (first_mouse) {
         last_x = x;
@@ -481,7 +488,7 @@ static void on_timer(int value)
         }
     } else if (value == DOOR_TIMER_ID_18) {
 
-        door_parameter_18 += 0.01;
+        door_parameter_18 += CUBE_SIZE / 60;
         if (door_parameter_18 >= CUBE_SIZE + 0.1) {
             door_parameter_18 = -1;
             door_timer_18_active = false;
@@ -494,7 +501,7 @@ static void on_timer(int value)
         }
     } else if (value == DOOR_TIMER_ID_27) {
 
-        door_parameter_27 += 0.01;
+        door_parameter_27 += CUBE_SIZE / 60;
         if (door_parameter_27 >= CUBE_SIZE + 0.1) {
             door_parameter_27 = -1;
             door_timer_27_active = false;
@@ -507,7 +514,7 @@ static void on_timer(int value)
         }
     } else if (value == DOOR_TIMER_ID_41) {
 
-        door_parameter_41 += 0.01;
+        door_parameter_41 += CUBE_SIZE / 60;
         if (door_parameter_41 >= CUBE_SIZE + 0.1) {
             door_parameter_41 = -1;
             door_timer_41_active = false;
@@ -520,7 +527,7 @@ static void on_timer(int value)
         }
     } else if (value == DOOR_TIMER_ID_86) {
 
-        door_parameter_86 += 0.01;
+        door_parameter_86 += CUBE_SIZE / 60;
         if (door_parameter_86 >= CUBE_SIZE + 0.1) {
             door_parameter_86 = -1;
             door_timer_86_active = false;
@@ -542,7 +549,7 @@ static void on_reshape(int width, int height)
     glViewport(0, 0, width, height);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(60, (float)width / height, 1, 15);
+    gluPerspective(60, (float)width / height, 1, 20*CUBE_SIZE);
 }
 
 static void glut_initialize()
@@ -719,13 +726,13 @@ static void create_wall(float cube_size, int height)
 
 static void create_key()
 {
-    float body_radius = 0.015;
-    float body_height = 0.2;
+    float body_radius = CUBE_SIZE / 40;
+    float body_height = CUBE_SIZE / 3;
 
     /* Key torus part */
     glPushMatrix();
-        glTranslatef(0.04, 0, 0);
-        glutSolidTorus(0.015, 0.05, 10, 20);
+        glTranslatef(CUBE_SIZE / 15, 0, 0);
+        glutSolidTorus(body_radius, CUBE_SIZE / 12, 10, 20);
     glPopMatrix();
 
     /* Key body */
@@ -736,12 +743,18 @@ static void create_key()
 
     /* "Teeth" */
     glPushMatrix();
-        glTranslatef(-0.16, -0.1, 0);
+        glTranslatef(-CUBE_SIZE / 3.5, -CUBE_SIZE / 10, 0);
         draw_cylinder(body_radius/1.5, body_height/3);
 
-        glTranslatef(0.05, 0, 0);
+        glTranslatef(CUBE_SIZE / 12, 0, 0);
         draw_cylinder(body_radius/1.5, body_height/3);
     glPopMatrix();
+    
+}
+
+static void create_switch()
+{
+    draw_cylinder(CUBE_SIZE / 20, CUBE_SIZE / 2);
 }
 
 void set_vector4f(GLfloat* vector, float r, float g, float b, float a) 
@@ -755,10 +768,10 @@ void set_vector4f(GLfloat* vector, float r, float g, float b, float a)
 static void create_teleport(float x, float y, float z, char color)
 {
     /* Reminder: (x,y,z) are the coordinates of the center of the cube */
-    float r = CUBE_SIZE / 2 - 0.05;
-    float r_in = CUBE_SIZE / 2 - 0.1 - 0.02;
+    float r = 0.8 * CUBE_SIZE / 2; /* 80% of CUBE_SIZE / 2 */
+    float r_in = CUBE_SIZE / 3.2;
+    float line_height = 0.8 * CUBE_SIZE;
     float angle_scale = 2.1;
-    float line_height_scale = 1.3;
     float phi;
 
     GLfloat inner[4];
@@ -838,7 +851,7 @@ static void create_teleport(float x, float y, float z, char color)
                     y, 
                     z + r_in * cos(angle_scale*phi));
             glVertex3f(x + r_in * sin(angle_scale*phi), 
-                    y + CUBE_SIZE / line_height_scale, 
+                    y + line_height, 
                     z + r_in * cos(angle_scale*phi));
         glEnd();        
     }
@@ -847,12 +860,12 @@ static void create_teleport(float x, float y, float z, char color)
     glColor4fv(outer);
 
     float v;
-    float ring_height = 0.025;
+    float ring_height = CUBE_SIZE / 24;
 
     glPushMatrix();
         glRotatef(-global_time_parameter, 0, 1, 0);
-        for (v = 0.05; v <= CUBE_SIZE/2.2; v += 0.035) {
-            glTranslatef(0, 0.07, 0);
+        for (v = ring_height; v <= line_height; v += 2*ring_height) {
+            glTranslatef(0, 2*ring_height, 0);
             glTranslatef(0, 0.005 * sin(teleport_parameter), 0);
             draw_cylinder(r, ring_height);
         }
@@ -1019,12 +1032,11 @@ static void create_map()
 {
     int i, j;
 
-    float switch_height = 0.4;
-    float elevator_height = 0.15;
+    float elevator_scale_factor = 0.15;
 
     /* Special factor that fixes the elevator position since scaling
      * will cause the elevator to float in space */
-    float e_scale_move_factor = 2 * elevator_height - 4 * EPS;
+    float e_scale_move_factor = 0.8 * elevator_scale_factor * CUBE_SIZE * CUBE_SIZE;
 
     glPushMatrix();
 
@@ -1110,9 +1122,9 @@ static void create_map()
                             glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
                             glTranslatef(0, -e_scale_move_factor, 0);
 
-                            move_elevator(i, j, elevator_height);
+                            move_elevator(i, j, elevator_scale_factor);
 
-                            glScalef(1, elevator_height, 1);
+                            glScalef(1, elevator_scale_factor, 1);
                             set_diffuse(0.7, 0.7, 0.4, 1);
                             glutSolidCube(CUBE_SIZE);
                         glPopMatrix();
@@ -1162,17 +1174,14 @@ static void create_map()
                         if (check_switch_inventory(i, j)) {
                             glPushMatrix();
                                 glTranslatef(x, map[i][j].height * CUBE_SIZE, z);
+                                glTranslatef(0, - CUBE_SIZE / 2.5, 0);
 
-                                /* glRotatef(-30, 0, 0, 1) will slightly move the switch
-                                * to the right; we fix it by moving slightly to the left.
-                                * Also, -CUBE_SIZE/2 is to lower the floating effect */
-                                glTranslatef(0, -CUBE_SIZE / 2, 0);
-
+                                /* Rotating switch around y-axis */
                                 glRotatef(global_time_parameter * 2, 0, 1, 0);
 
                                 glRotatef(-25, 0, 0, 1);
                                 set_diffuse(0.5, 0.5, 0.7, 1);
-                                draw_cylinder(0.035, switch_height);
+                                create_switch();
                             glPopMatrix();
                         }
                         break;
