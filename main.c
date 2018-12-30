@@ -146,7 +146,7 @@ static bool first_mouse = true;
 static float theta = 0; /* [-89, 89] deg */
 static float phi = 0;   /* [0, 180) deg */
 
-/*Basic glut callback functions declarations*/
+/* Basic glut callback functions declarations */
 static void on_keyboard(unsigned char key, int x, int y);
 static void on_keyboard_release(unsigned char key, int x, int y);
 static void on_mouse_passive(int x, int y);
@@ -167,6 +167,9 @@ static void create_map();
 
 /* Basic GL/glut initialization */
 static void glut_initialize();
+
+/* Handles player movement */
+static void player_movement();
 
 /* Other initialization */
 static void other_initialize();
@@ -384,7 +387,9 @@ static void on_keyboard_release(unsigned char key, int x, int y)
 {
     if (key == 'w' || key == 's') {
         v_forward = 0;
-    } else if (key == 'd' || key == 'a') {
+    }
+
+    if (key == 'd' || key == 'a') {
         v_right = 0;
     }
 }
@@ -436,16 +441,32 @@ static void on_mouse_passive(int x, int y)
     glm_vec3_copy(front, camera_front);
 }
 
+static void player_movement()
+{
+    /* Calculating right vector and directional vector */
+    glm_vec3_crossn(camera_front, camera_up, camera_right);
+    glm_vec3_add(camera_pos, camera_front, camera_direction);
+
+    /* Handling player movement: v_forward = +-1 if w or s is pressed (respectively),
+     * v_right = +-1 if d or a is pressed. Otherwise, on keyboard release they become 0. */
+    glm_vec3_muladds(camera_front, v_forward * camera_speed, camera_pos);
+    glm_vec3_muladds(camera_right, v_right * camera_speed, camera_pos);
+}
+
 static void on_timer(int value)
 {
     if (value == GLOBAL_TIMER_ID) {
 
         global_time_parameter += 1;
 
-        /* Handling player movement: v_forward = +-1 if w or s is pressed (respectively),
-         * v_right = +-1 if d or a is pressed. Otherwise, on keyboard release they become 0. */
-        glm_vec3_muladds(camera_front, v_forward * camera_speed, camera_pos);
-        glm_vec3_muladds(camera_right, v_right * camera_speed, camera_pos);
+        /* Calculating right vector and directional vector */
+    glm_vec3_crossn(camera_front, camera_up, camera_right);
+    glm_vec3_add(camera_pos, camera_front, camera_direction);
+
+    /* Handling player movement: v_forward = +-1 if w or s is pressed (respectively),
+     * v_right = +-1 if d or a is pressed. Otherwise, on keyboard release they become 0. */
+    glm_vec3_muladds(camera_front, v_forward * camera_speed, camera_pos);
+    glm_vec3_muladds(camera_right, v_right * camera_speed, camera_pos);
 
         glutPostRedisplay();
 
@@ -1358,10 +1379,6 @@ static void on_display(void)
 
     /* Clearing the previous window appearance */
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    /* Calculating right vector and directional vector */
-    glm_vec3_crossn(camera_front, camera_up, camera_right);
-    glm_vec3_add(camera_pos, camera_front, camera_direction);
 
     /* Cammera settings */
     glMatrixMode(GL_MODELVIEW);
