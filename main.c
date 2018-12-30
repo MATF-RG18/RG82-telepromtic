@@ -127,6 +127,10 @@ static vec3 camera_right;
 /* Camera speed (player movement speed) */
 static float camera_speed = 0.2f;
 
+/* Keyboard indicators: 0 - w,s,a,d is not pressed */
+static int v_forward = 0;
+static int v_right = 0;
+
 /* Last (x, y) coordinates of mouse pointer registered on window */
 static float last_x = 400;
 static float last_y = 300;
@@ -144,6 +148,7 @@ static float phi = 0;   /* [0, 180) deg */
 
 /*Basic glut callback functions declarations*/
 static void on_keyboard(unsigned char key, int x, int y);
+static void on_keyboard_release(unsigned char key, int x, int y);
 static void on_mouse_passive(int x, int y);
 static void on_timer(int value);
 static void on_reshape(int width, int height);
@@ -247,6 +252,7 @@ int main(int argc, char** argv)
 
     /* Registrating glut callback functions */
     glutKeyboardFunc(on_keyboard);
+    glutKeyboardUpFunc(on_keyboard_release);
     glutPassiveMotionFunc(on_mouse_passive);
     glutReshapeFunc(on_reshape);
     glutDisplayFunc(on_display);
@@ -360,26 +366,27 @@ static void on_keyboard(unsigned char key, int x, int y)
         glutPostRedisplay();
     } else if (key == 'w' || key == 'W') {
         /* Moving forward */
-        glm_vec3_muladds(camera_front, camera_speed, camera_pos);
-        glutPostRedisplay();
-        check_player_position();
+        v_forward = 1;
     } else if (key == 's' || key == 'S') {
         /* Moving backward */
-        glm_vec3_muladds(camera_front, -camera_speed, camera_pos);
-        glutPostRedisplay();
-        check_player_position();
+        v_forward = -1;
     } else if (key == 'a' || key == 'A') {
         /* Moving left */
-        glm_vec3_muladds(camera_right, -camera_speed, camera_pos);
-        glutPostRedisplay();
-        check_player_position();
+        v_right = -1;
     } else if (key == 'd' || key == 'D') {
         /* Moving right */
-        glm_vec3_muladds(camera_right, camera_speed, camera_pos);
-        glutPostRedisplay();
-        check_player_position();
+        v_right = 1;
     }
 
+}
+
+static void on_keyboard_release(unsigned char key, int x, int y)
+{
+    if (key == 'w' || key == 's') {
+        v_forward = 0;
+    } else if (key == 'd' || key == 'a') {
+        v_right = 0;
+    }
 }
 
 static void on_mouse_passive(int x, int y)
@@ -435,7 +442,14 @@ static void on_timer(int value)
 
         global_time_parameter += 1;
 
+        /* Handling player movement: v_forward = +-1 if w or s is pressed (respectively),
+         * v_right = +-1 if d or a is pressed. Otherwise, on keyboard release they become 0. */
+        glm_vec3_muladds(camera_front, v_forward * camera_speed, camera_pos);
+        glm_vec3_muladds(camera_right, v_right * camera_speed, camera_pos);
+
         glutPostRedisplay();
+
+        check_player_position();
 
         if (global_timer_active) {
             glutTimerFunc(TIMER_INTERVAL, on_timer, GLOBAL_TIMER_ID);
