@@ -773,7 +773,7 @@ static void set_vector4f(GLfloat* vector, float r, float g, float b, float a)
 static void create_teleport(float x, float y, float z, char color)
 {
     /* Reminder: (x,y,z) are the coordinates of the center of the cube */
-    float r = 0.8 * CUBE_SIZE / 2; /* 80% of CUBE_SIZE / 2 */
+    float r = 0.8 * CUBE_SIZE / 2; // 80% of CUBE_SIZE / 2
     float r_in = CUBE_SIZE / 3.2;
     float line_height = 0.8 * CUBE_SIZE;
     float angle_scale = 2.1;
@@ -783,6 +783,7 @@ static void create_teleport(float x, float y, float z, char color)
     GLfloat outer[4];
     GLfloat lines[4];
 
+    /* Setting teleport color */
     switch (color) {
         case 'b':   
             set_vector4f(inner, 0, 0.3, 1, 1);             
@@ -1062,10 +1063,12 @@ static void check_player_position()
     min_height = (map[i][j].height - 1) * CUBE_SIZE;
     max_height = map[i][j].height * CUBE_SIZE + CUBE_SIZE;
 
+    /* If player steps on lava, he dies */
     if (map[i][j].type == 'l' && check_height(min_height, max_height)) {
         fprintf(stdout, "You died!\n");
         exit(EXIT_SUCCESS);
     } else if (map[i][j].type == 'k' && check_height(min_height, max_height)) {
+        /* Collecting proper key */
         if (i == 1 && j == 1) {
             has_key_11 = true;
         } else if (i == 2 && j == 3) {
@@ -1078,6 +1081,7 @@ static void check_player_position()
             // Ignore
         }
     } else if (map[i][j].type == 's' && check_height(min_height, max_height)) {
+        /* Collecting proper switch */
         if (i == 4 && j == 4) {
             has_switch_44 = true;
         } else if (i == 7 && j == 3) {
