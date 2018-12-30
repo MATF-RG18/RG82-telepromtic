@@ -15,6 +15,8 @@ void osError(bool condition, const char* msg) {
     }
 }
 
+#define EXIT_KEY 27
+
 #define MAX_FILE_NAME 32
 
 #define PI 3.14159265359
@@ -129,6 +131,10 @@ static float camera_speed = 0.2f;
 static float last_x = 400;
 static float last_y = 300;
 
+/* Center coordinates */
+static int center_x = 400;
+static int center_y = 300;
+
 /* Flag - false after mouse is catched for the first time */
 static bool first_mouse = true;
 
@@ -174,6 +180,21 @@ static void draw_cylinder(float r, float h);
  * Wall is constructed of height cubes piled on each other. */
 static void create_wall(float cube_size, int height);
 
+/* Support function used for coloring */
+static void set_vector4f(GLfloat* vector, float r, float g, float b, float a); 
+
+/* If proper switch is gathered, it's not rendered on the map */
+static bool check_switch_inventory(int i, int j);
+
+/* If proper key is gathered, it's not rendered on the map */
+static bool check_key_inventory(int i, int j);
+
+/* If door has moved beyond minimal point, it's no longer rendered on the map */
+static bool check_door_moved(int i, int j);
+
+/* Support function that checks the player position */
+static bool check_height(float min_height, float max_height); 
+
 /* Creates key of fixed size */
 static void create_key();
 
@@ -188,6 +209,10 @@ static void move_elevator(int i, int j, float e_height);
 
 /* Moves doors if their connected keys are gathered */
 static void move_door(int i, int j);
+
+/* Checking player position upon camera_pos changes: 
+ * function checks map matrix type and renders proper effect */
+static void check_player_position();
 
 
 int main(int argc, char** argv)
@@ -260,129 +285,90 @@ int main(int argc, char** argv)
 
 static void on_keyboard(unsigned char key, int x, int y)
 {
-    switch (key) {
-        /* 'esc' exits the program */
-        case 27:
-            exit(0);
-            break;
+    if (key == EXIT_KEY) {
+        /* Exiting program */
+        exit(EXIT_SUCCESS);
+    } else if (key == '1') {
+        has_switch_98 = true;
+        glutPostRedisplay();
+    } else if (key == '2') {
+        has_switch_44 = true;
+        glutPostRedisplay();
+    } else if (key == '3') {
+        has_switch_73 = true;
+        glutPostRedisplay();
+    } else if (key == '4') {
+        has_switch_77 = true;
+        glutPostRedisplay();
+    } else if (key == '5') {
+        has_key_11 = true;
+        glutPostRedisplay();
+    } else if (key == '6') {
+        has_key_23 = true;
+        glutPostRedisplay();
+    } else if (key == '7') {
+        has_key_71 = true;
+        glutPostRedisplay();
+    } else if (key == '8') {
+        has_key_99 = true;
+        glutPostRedisplay();
+    } else if (key == 'r' || key == 'R') {
+        /* Reseting all parameters */
+        global_time_parameter = 0;
 
-        case '1':
-            has_switch_98 = true;
-            glutPostRedisplay();
-            break;
+        elevator_parameter_12 = 0;
+        elevator_parameter_25 = 0;
+        elevator_parameter_58 = 0;
+        elevator_parameter_89 = 0;
 
-        case '2':
-            has_switch_44 = true;
-            glutPostRedisplay();
-            break;
+        elevator_timer_12_active = false;
+        elevator_timer_25_active = false;
+        elevator_timer_58_active = false;
+        elevator_timer_89_active = false;
 
-        case '3':
-            has_switch_73 = true;
-            glutPostRedisplay();
-            break;
+        has_switch_44 = false;
+        has_switch_73 = false;
+        has_switch_77 = false;
+        has_switch_98 = false;
 
-        case '4':
-            has_switch_77 = true;
-            glutPostRedisplay();
-            break;
+        door_parameter_18 = 0;
+        door_parameter_27 = 0;
+        door_parameter_41 = 0;
+        door_parameter_86 = 0;
 
-        case '5':
-            has_key_11 = true;
-            glutPostRedisplay();
-            break;
+        door_timer_18_active = false;
+        door_timer_27_active = false;
+        door_timer_41_active = false;
+        door_timer_86_active = false;
 
-        case '6':
-            has_key_23 = true;
-            glutPostRedisplay();
-            break;
+        has_key_11 = false;
+        has_key_23 = false;
+        has_key_71 = false;
+        has_key_99 = false;
 
-        case '7':
-            has_key_71 = true;
-            glutPostRedisplay();
-            break;
-
-        case '8':
-            has_key_99 = true;
-            glutPostRedisplay();
-            break;
-
-        case 'z':
-        case 'Z':
-            if (!global_timer_active) {
-                global_timer_active = true;
-                glutTimerFunc(20, on_timer, GLOBAL_TIMER_ID);
-            }
-            break;
-
-        case 'x':
-        case 'X':
-            global_time_parameter = false;
-            glutPostRedisplay();
-            break;
-
-        case 'r':
-        case 'R':
-            /* Reseting all parameters */
-            global_time_parameter = 0;
-
-            elevator_parameter_12 = 0;
-            elevator_parameter_25 = 0;
-            elevator_parameter_58 = 0;
-            elevator_parameter_89 = 0;
-
-            elevator_timer_12_active = false;
-            elevator_timer_25_active = false;
-            elevator_timer_58_active = false;
-            elevator_timer_89_active = false;
-
-            has_switch_44 = false;
-            has_switch_73 = false;
-            has_switch_77 = false;
-            has_switch_98 = false;
-
-            door_parameter_18 = 0;
-            door_parameter_27 = 0;
-            door_parameter_41 = 0;
-            door_parameter_86 = 0;
-
-            door_timer_18_active = false;
-            door_timer_27_active = false;
-            door_timer_41_active = false;
-            door_timer_86_active = false;
-
-            has_key_11 = false;
-            has_key_23 = false;
-            has_key_71 = false;
-            has_key_99 = false;
-
-            glutPostRedisplay();
-            break;
-
-        case 'w':
-        case 'W':
-            glm_vec3_muladds(camera_front, camera_speed, camera_pos);
-            glutPostRedisplay();
-            break;
-
-        case 's':
-        case 'S':
-            glm_vec3_muladds(camera_front, -camera_speed, camera_pos);
-            glutPostRedisplay();
-            break;
-
-        case 'a':
-        case 'A':
-            glm_vec3_muladds(camera_right, -camera_speed, camera_pos);
-            glutPostRedisplay();
-            break;
-            break;
-
-        case 'd':
-        case 'D':
-            glm_vec3_muladds(camera_right, camera_speed, camera_pos);
-            glutPostRedisplay();
-            break;
+        glutPostRedisplay();
+    } else if (key == 'w' || key == 'W') {
+        /* Moving forward */
+        glm_vec3_muladds(camera_front, camera_speed, camera_pos);
+        glutPostRedisplay();
+        check_player_position();
+    } else if (key == 's' || key == 'S') {
+        /* Moving backward */
+        glm_vec3_muladds(camera_front, -camera_speed, camera_pos);
+        glutPostRedisplay();
+        check_player_position();
+    } else if (key == 'a' || key == 'A') {
+        /* Moving left */
+        glm_vec3_muladds(camera_right, -camera_speed, camera_pos);
+        glutPostRedisplay();
+        check_player_position();
+    } else if (key == 'd' || key == 'D') {
+        /* Moving right */
+        glm_vec3_muladds(camera_right, camera_speed, camera_pos);
+        glutPostRedisplay();
+        check_player_position();
     }
+
 }
 
 static void on_mouse_passive(int x, int y)
@@ -394,6 +380,8 @@ static void on_mouse_passive(int x, int y)
         last_x = x;
         last_y = y;
         first_mouse = false;
+
+        glutWarpPointer(center_x, center_y);
     }
 
     /* Calculating mouse move */
@@ -559,6 +547,9 @@ static void glut_initialize()
 
     /* Normal vector intesities set to 1 */
     glEnable(GL_NORMALIZE);
+
+    /* Removes cursor visibility */
+    glutSetCursor(GLUT_CURSOR_NONE);
 
     /* Transparency settings */
     glEnable(GL_BLEND);
@@ -757,7 +748,7 @@ static void create_switch()
     draw_cylinder(CUBE_SIZE / 20, CUBE_SIZE / 2);
 }
 
-void set_vector4f(GLfloat* vector, float r, float g, float b, float a) 
+static void set_vector4f(GLfloat* vector, float r, float g, float b, float a) 
 {
     vector[0] = r;
     vector[1] = g;
@@ -934,7 +925,7 @@ static void move_elevator(int i, int j, float e_height)
     }
 }
 
-bool check_switch_inventory(int i, int j)
+static bool check_switch_inventory(int i, int j)
 {
     /* If the proper switch is gathered, switch won't be rendered */
     if (has_switch_44 && i == 4 && j == 4) {
@@ -945,6 +936,8 @@ bool check_switch_inventory(int i, int j)
         return false;
     } else if (has_switch_98 && i == 9 && j == 8) {
         return false;
+    } else {
+        // Ignore
     }
 
     /* Default: no switches are gathered and they are all rendered */
@@ -994,7 +987,7 @@ static void move_door(int i, int j)
     }
 }
 
-bool check_key_inventory(int i, int j)
+static bool check_key_inventory(int i, int j)
 {
     /* If the proper key is gathered, key won't be rendered */
     if (has_key_11 && i == 1 && j == 1) {
@@ -1005,13 +998,15 @@ bool check_key_inventory(int i, int j)
         return false;
     } else if (has_key_99 && i == 9 && j == 9) {
         return false;
+    } else {
+        // Ignore
     }
 
     /* Default: no keys are gathered and they are all rendered */
     return true;
 }
 
-bool check_door_moved(int i, int j)
+static bool check_door_moved(int i, int j)
 {
     /* If door was moved, parameter will be -1 and doors won't be rendered */
     if (door_parameter_18 < 0 && i == 1 && j == 8) {
@@ -1022,10 +1017,67 @@ bool check_door_moved(int i, int j)
         return true;
     } else if (door_parameter_86 < 0 && i == 8 && j == 6) {
         return true;
+    } else {
+        // Ignore
     }
 
     /* Default: doors haven't moved and are all rendered */
     return false;
+}
+
+static bool check_height(float min_height, float max_height) 
+{
+    /* Player height validation */
+    if (camera_pos[1] >= min_height && camera_pos[1] <= max_height) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+static void check_player_position()
+{
+    int i, j, tmp;
+    float min_height, max_height;
+
+    tmp = map_rows + camera_pos[2] / CUBE_SIZE;
+    /* Map matrix positions */
+    i = tmp > 10 ? 10 : tmp; // Row 10 bug fix
+    j = camera_pos[0] / CUBE_SIZE;
+
+    min_height = (map[i][j].height - 1) * CUBE_SIZE;
+    max_height = map[i][j].height * CUBE_SIZE + CUBE_SIZE;
+
+    if (map[i][j].type == 'l' && check_height(min_height, max_height)) {
+        fprintf(stdout, "You died!\n");
+        exit(EXIT_SUCCESS);
+    } else if (map[i][j].type == 'k' && check_height(min_height, max_height)) {
+        if (i == 1 && j == 1) {
+            has_key_11 = true;
+        } else if (i == 2 && j == 3) {
+            has_key_23 = true;
+        } else if (i == 7 && j == 1) {
+            has_key_71 = true;
+        } else if (i == 9 && j == 9) {
+            has_key_99 = true;
+        } else {
+            // Ignore
+        }
+    } else if (map[i][j].type == 's' && check_height(min_height, max_height)) {
+        if (i == 4 && j == 4) {
+            has_switch_44 = true;
+        } else if (i == 7 && j == 3) {
+            has_switch_73 = true;
+        } else if (i == 7 && j == 7) {
+            has_switch_77 = true;
+        } else if ( i == 9 && j == 8) {
+            has_switch_98 = true;
+        } else {
+            // Ignore
+        }
+    }
+
+
 }
 
 static void create_map()
