@@ -127,7 +127,7 @@ static vec3 camera_right;
 /* Camera speed (player movement speed) */
 static float camera_speed = 0.2f;
 
-/* Keyboard indicators: 0 - w,s,a,d is not pressed */
+/* Keyboard press indicators */
 static int v_forward = 0;
 static int v_right = 0;
 
@@ -142,11 +142,14 @@ static int center_y = 300;
 /* Flag - false after mouse is catched for the first time */
 static bool first_mouse = true;
 
+/* Flag - becomes true once player starting position is initialized */
+static bool starting_player_position = false;
+
 /* Pitch and Yaw angles used for camera rotation */
 static float theta = 0; /* [-89, 89] deg */
 static float phi = 0;   /* [0, 180) deg */
 
-/* Basic glut callback functions declarations */
+/*Basic glut callback functions declarations*/
 static void on_keyboard(unsigned char key, int x, int y);
 static void on_keyboard_release(unsigned char key, int x, int y);
 static void on_mouse_passive(int x, int y);
@@ -168,11 +171,14 @@ static void create_map();
 /* Basic GL/glut initialization */
 static void glut_initialize();
 
-/* Handles player movement */
-static void player_movement();
-
 /* Other initialization */
 static void other_initialize();
+
+/* Sets player starting position */
+static void set_player_starting_position(int i, int j);
+
+/* Handles player movement */
+static void player_movement();
 
 /* Support function that sets diffuse coeffs in a global vector */
 static void set_diffuse(float r, float g, float b, float a);
@@ -387,9 +393,7 @@ static void on_keyboard_release(unsigned char key, int x, int y)
 {
     if (key == 'w' || key == 's') {
         v_forward = 0;
-    }
-
-    if (key == 'd' || key == 'a') {
+    } else if (key == 'a' || key == 'd') {
         v_right = 0;
     }
 }
@@ -441,32 +445,13 @@ static void on_mouse_passive(int x, int y)
     glm_vec3_copy(front, camera_front);
 }
 
-static void player_movement()
-{
-    /* Calculating right vector and directional vector */
-    glm_vec3_crossn(camera_front, camera_up, camera_right);
-    glm_vec3_add(camera_pos, camera_front, camera_direction);
-
-    /* Handling player movement: v_forward = +-1 if w or s is pressed (respectively),
-     * v_right = +-1 if d or a is pressed. Otherwise, on keyboard release they become 0. */
-    glm_vec3_muladds(camera_front, v_forward * camera_speed, camera_pos);
-    glm_vec3_muladds(camera_right, v_right * camera_speed, camera_pos);
-}
-
 static void on_timer(int value)
 {
     if (value == GLOBAL_TIMER_ID) {
 
         global_time_parameter += 1;
 
-        /* Calculating right vector and directional vector */
-    glm_vec3_crossn(camera_front, camera_up, camera_right);
-    glm_vec3_add(camera_pos, camera_front, camera_direction);
-
-    /* Handling player movement: v_forward = +-1 if w or s is pressed (respectively),
-     * v_right = +-1 if d or a is pressed. Otherwise, on keyboard release they become 0. */
-    glm_vec3_muladds(camera_front, v_forward * camera_speed, camera_pos);
-    glm_vec3_muladds(camera_right, v_right * camera_speed, camera_pos);
+        player_movement();
 
         glutPostRedisplay();
 
@@ -605,8 +590,8 @@ static void glut_initialize()
 static void other_initialize()
 {
     /* Setting up camera position and target */
-    glm_vec3((vec3){0.0f, 8*CUBE_SIZE, 0.0f}, camera_pos);
-    glm_vec3((vec3){1.0f, 0.0f, -1.0f}, camera_front);
+    // glm_vec3((vec3){0.0f, 8*CUBE_SIZE, 0.0f}, camera_pos);
+    // glm_vec3((vec3){1.0f, 0.0f, -1.0f}, camera_front);
 
     /* Scanning map dimensions */
     FILE* f = fopen(map_dimensions_file, "r");
@@ -617,6 +602,29 @@ static void other_initialize()
 
     /* Seeding time */
     srand(time(NULL));
+}
+
+static void set_player_starting_position(int i, int j)
+{
+    /* Calculating center of the cube and proper height */
+    float x = j * CUBE_SIZE + CUBE_SIZE / 2;
+    float z = -(map_rows - 1 - i) * CUBE_SIZE - CUBE_SIZE / 2;
+    float y = map[i][j].height * CUBE_SIZE - CUBE_SIZE / 2;
+
+    /* Setting player position via global vectors */
+    glm_vec3((vec3){x, y, z}, camera_pos);
+    glm_vec3((vec3){0, 0, z - 1}, camera_front);
+}
+
+static void player_movement()
+{
+    if (v_forward != 0) {
+        glm_vec3_muladds(camera_front, v_forward * camera_speed, camera_pos);
+    }
+
+    if (v_right != 0) {
+        glm_vec3_muladds(camera_right, v_right * camera_speed, camera_pos);
+    }
 }
 
 static FieldData** allocate_map()
@@ -810,7 +818,7 @@ static void create_teleport(float x, float y, float z, char color)
     /* Reminder: (x,y,z) are the coordinates of the center of the cube */
     float r = 0.8 * CUBE_SIZE / 2; // 80% of CUBE_SIZE / 2
     float r_in = CUBE_SIZE / 3.2;
-    float line_height = 0.8 * CUBE_SIZE;
+    float line_height = 0.9 * CUBE_SIZE;
     float angle_scale = 2.1;
     float phi;
 
@@ -1096,10 +1104,10 @@ static void check_player_position()
     j = camera_pos[0] / CUBE_SIZE;
 
     min_height = (map[i][j].height - 1) * CUBE_SIZE;
-    max_height = map[i][j].height * CUBE_SIZE + CUBE_SIZE;
+    max_height = map[i][j].height * CUBE_SIZE + CUBE_SIZE / 2;
 
     /* If player steps on lava, he dies */
-    if (map[i][j].type == 'l' && check_height(min_height, max_height)) {
+    if (map[i][j].type == 'l' && check_height(min_height, max_height + CUBE_SIZE / 3)) {
         fprintf(stdout, "You died!\n");
         exit(EXIT_SUCCESS);
     } else if (map[i][j].type == 'k' && check_height(min_height, max_height)) {
@@ -1342,6 +1350,21 @@ static void create_map()
                         }
                         break;
 
+                    case '@':
+                        /* Grass */
+                        glPushMatrix();
+                            glTranslatef(x, 0, z);
+                            set_diffuse(0.2, 0.7, 0.1, 1);
+                            glutSolidCube(CUBE_SIZE);
+                        glPopMatrix();
+
+                        /* Setting starting player position */
+                        if (!starting_player_position) {
+                            starting_player_position = true;
+                            set_player_starting_position(i, j);
+                        }
+                        break;
+
                     /* Teleport case */
                     default:
                         /* Grass and wall */
@@ -1379,6 +1402,10 @@ static void on_display(void)
 
     /* Clearing the previous window appearance */
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    /* Calculating right vector and directional vector */
+    glm_vec3_crossn(camera_front, camera_up, camera_right);
+    glm_vec3_add(camera_pos, camera_front, camera_direction);
 
     /* Cammera settings */
     glMatrixMode(GL_MODELVIEW);
