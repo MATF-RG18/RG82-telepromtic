@@ -214,6 +214,13 @@ static void move_door(int i, int j);
  * function checks map matrix type and renders proper effect */
 static void check_player_position();
 
+/* Support function that checks if player is positioned inside teleport circle */
+static bool check_inside_circle(int i, int j);
+
+/* Function that handles teleportation if player is on right position
+ * and activates the teleport */
+static void check_teleportation();
+
 
 int main(int argc, char** argv)
 {
@@ -346,6 +353,10 @@ static void on_keyboard(unsigned char key, int x, int y)
         has_key_71 = false;
         has_key_99 = false;
 
+        glutPostRedisplay();
+    } else if (key == 't' || key == 'T') {
+        /* Teleportation if player is in proper position */
+        check_teleportation();
         glutPostRedisplay();
     } else if (key == 'w' || key == 'W') {
         /* Moving forward */
@@ -619,8 +630,8 @@ static void store_map_data()
     for (i = 0; i < map_rows; i++) {
         for (j = 0; j < map_cols; j++) {
             fscanf(f, "%c%d ", &(*(map + i) + j)->type, &(*(map + i) + j)->height);
-            /* Connection coords are initially -1: they will be updated later */
-            map[i][j].to_row = map[i][j].to_col = -1;
+            /* Connection coords are initially 0: they will be updated later */
+            map[i][j].to_row = map[i][j].to_col = 0;
             /* Color is initially the same as type - works for teleport colors */
             map[i][j].color = map[i][j].type;
         }
@@ -642,9 +653,12 @@ static void store_map_connections()
     fgetc(f);
     for (i = 0; i < n; i++) {
         fscanf(f, "%c %d %d %d %d ", &c, &row1, &col1, &row2, &col2);
+
+        /* Connecting teleports, key/doors and switch/elevators */
         map[row1][col1].color = c;
         map[row1][col1].to_row = row2;
         map[row1][col1].to_col = col2;
+
         /* And also backwards! */
         map[row2][col2].color = c;
         map[row2][col2].to_row = row1;
@@ -1077,7 +1091,58 @@ static void check_player_position()
         }
     }
 
+}
 
+static bool check_inside_circle(int i, int j)
+{
+    /* Coordinates of the center of the cube */
+    float x_center = j * CUBE_SIZE + CUBE_SIZE / 2;
+    float z_center = -(map_rows - 1 - i) * CUBE_SIZE - CUBE_SIZE / 2;
+
+    /* Player current position */
+    float x_player = camera_pos[0];
+    float z_player = camera_pos[2];
+
+    /* Teleport inner radius, squared */
+    float r_in_square = (0.75 * CUBE_SIZE / 2) * (0.75 * CUBE_SIZE / 2);
+
+    /* Player distance, squared */
+    float d_square = (x_player - x_center) * (x_player - x_center) 
+                   + (z_player - z_center) * (z_player - z_center);
+
+    return d_square <= r_in_square ? true : false;
+}
+
+static void check_teleportation()
+{
+    int i, j, tmp;
+    float min_height, max_height;
+
+    tmp = map_rows + camera_pos[2] / CUBE_SIZE;
+    /* Map matrix positions */
+    i = tmp > 10 ? 10 : tmp; // Row 10 bug fix
+    j = camera_pos[0] / CUBE_SIZE;
+
+    min_height = (map[i][j].height - 1) * CUBE_SIZE;
+    max_height = map[i][j].height * CUBE_SIZE;
+
+    /* Checking player position map type. If teleport, teleports player to proper position */
+    if ( (map[i][j].type == 'g' || map[i][j].type == 'b' || map[i][j].type == 'p'
+         || map[i][j].type == 'r' || map[i][j].type == 'm' || map[i][j].type == 'c'
+         || map[i][j].type == 'y' || map[i][j].type == 'o') 
+         && check_inside_circle(i, j) && check_height(min_height, max_height) )
+    {
+        int to_row = map[i][j].to_row;
+        int to_col = map[i][j].to_col;
+
+        /* Calculating next player position via map matrix data (to_row and to_col values) */
+        float to_x = to_col * CUBE_SIZE + CUBE_SIZE / 2;
+        float to_z = -(map_rows - 1 - to_row) * CUBE_SIZE - CUBE_SIZE / 2;
+        float to_height = (map[to_row][to_col].height - 1) * CUBE_SIZE + CUBE_SIZE / 2;
+
+        /* Updating player position vector */
+        glm_vec3((vec3){to_x, to_height, to_z}, camera_pos);
+    }
 }
 
 static void create_map()
