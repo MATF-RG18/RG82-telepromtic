@@ -1103,7 +1103,7 @@ static void check_player_position()
     i = tmp > 10 ? 10 : tmp; // Row 10 bug fix
     j = camera_pos[0] / CUBE_SIZE;
 
-    min_height = (map[i][j].height - 1) * CUBE_SIZE;
+    min_height = (map[i][j].height - 1) * CUBE_SIZE + CUBE_SIZE / 3;
     max_height = map[i][j].height * CUBE_SIZE + CUBE_SIZE / 2;
 
     /* If player steps on lava, he dies */
@@ -1136,6 +1136,12 @@ static void check_player_position()
         } else {
             // Ignore
         }
+    } else if (map[i][j].type == 'X' && check_height(min_height, max_height - CUBE_SIZE / 3) 
+        && check_inside_circle(i, j)) {
+        fprintf(stdout, "YOU WON !!!\n");
+        exit(EXIT_SUCCESS);
+    } else {
+        // Ignore
     }
 
 }
@@ -1170,7 +1176,7 @@ static void check_teleportation()
     i = tmp > 10 ? 10 : tmp; // Row 10 bug fix
     j = camera_pos[0] / CUBE_SIZE;
 
-    min_height = (map[i][j].height - 1) * CUBE_SIZE;
+    min_height = (map[i][j].height - 1) * CUBE_SIZE + CUBE_SIZE / 3;
     max_height = map[i][j].height * CUBE_SIZE;
 
     /* Checking player position map type. If teleport, teleports player to proper position */
