@@ -404,11 +404,10 @@ static void on_mouse_passive(int x, int y)
 
     /* First mouse register */
     if (first_mouse) {
-        last_x = x;
-        last_y = y;
         first_mouse = false;
 
         glutWarpPointer(center_x, center_y);
+        return;
     }
 
     /* Calculating mouse move */
@@ -573,6 +572,7 @@ static void on_reshape(int width, int height)
 
 static void glut_initialize()
 {   
+    /* Clearing frame buffer and enabling depth test */
     glClearColor(0.7, 0.7, 0.7, 0);
     glEnable(GL_DEPTH_TEST);
 
@@ -625,6 +625,10 @@ static void player_movement()
     if (v_right != 0) {
         glm_vec3_muladds(camera_right, v_right * camera_speed, camera_pos);
     }
+
+    /* Calculating right vector and directional vector */
+    glm_vec3_crossn(camera_front, camera_up, camera_right);
+    glm_vec3_add(camera_pos, camera_front, camera_direction);
 }
 
 static FieldData** allocate_map()
@@ -906,6 +910,7 @@ static void create_teleport(float x, float y, float z, char color)
     }
 
     /* Outer rings */
+    /*
     glColor4fv(outer);
 
     float v;
@@ -919,6 +924,23 @@ static void create_teleport(float x, float y, float z, char color)
             draw_cylinder(r, ring_height);
         }
     glPopMatrix();
+    */
+    
+   /* Outer rotating lines */
+    glLineWidth(2.2);
+    glColor4fv(lines);
+
+    glRotatef(-teleport_parameter * RAD_TO_DEG, 0, 1, 0);
+    for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
+        glBegin(GL_LINES);
+            glVertex3f(x  + r * sin(phi), 
+                    y, 
+                    z + r * cos(phi));
+            glVertex3f(x + r * sin(phi), 
+                    y + line_height, 
+                    z + r * cos(phi));
+        glEnd();        
+    }
 
     glEnable(GL_LIGHTING);
 }
@@ -1136,7 +1158,7 @@ static void check_player_position()
         } else {
             // Ignore
         }
-    } else if (map[i][j].type == 'X' && check_height(min_height, max_height - CUBE_SIZE / 3) 
+    } else if (map[i][j].type == 'X' && check_height(min_height, max_height - CUBE_SIZE / 2) 
         && check_inside_circle(i, j)) {
         fprintf(stdout, "YOU WON !!!\n");
         exit(EXIT_SUCCESS);
@@ -1408,10 +1430,6 @@ static void on_display(void)
 
     /* Clearing the previous window appearance */
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    /* Calculating right vector and directional vector */
-    glm_vec3_crossn(camera_front, camera_up, camera_right);
-    glm_vec3_add(camera_pos, camera_front, camera_direction);
 
     /* Cammera settings */
     glMatrixMode(GL_MODELVIEW);
