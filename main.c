@@ -56,10 +56,13 @@ typedef struct field {
 
 /* Height and width of the map */
 static int map_rows, map_cols;
+
 /* Metadata input file (map info about every cube) */
 const static char map_input_file[MAX_FILE_NAME] = "map.txt";
+
 /* Map dimensions file */
 const static char map_dimensions_file[MAX_FILE_NAME] = "map_dimensions.txt";
+
 /* Map connections and teleport colors file */
 const static char map_connections_file[MAX_FILE_NAME] = "map_connections.txt";
 
@@ -125,7 +128,7 @@ static vec3 camera_direction;
 static vec3 camera_right;
 
 /* Camera speed (player movement speed) */
-static float camera_speed = 0.2f;
+static float camera_speed = 0.15f;
 
 /* Keyboard press indicators */
 static int v_forward = 0;
@@ -146,10 +149,10 @@ static bool first_mouse = true;
 static bool starting_player_position = false;
 
 /* Pitch and Yaw angles used for camera rotation */
-static float theta = 0; /* [-89, 89] deg */
-static float phi = 0;   /* [0, 180) deg */
+static float theta = 0; // [-89, 89] deg 
+static float phi = 0;   // [0, 180) deg
 
-/*Basic glut callback functions declarations*/
+/* Basic glut callback functions declarations */
 static void on_keyboard(unsigned char key, int x, int y);
 static void on_keyboard_release(unsigned char key, int x, int y);
 static void on_mouse_passive(int x, int y);
@@ -159,12 +162,16 @@ static void on_display(void);
 
 /* Function that alocates space for map matrix */
 static FieldData** allocate_map();
+
 /* Function that frees dymanicly allocated space for map matrix */
 static FieldData** free_map();
+
 /* Function that stores cube types and their heights, pulled from a .txt file. */
 static void store_map_data();
+
 /* Function that stores map field connections and teleport colors */
 static void store_map_connections();
+
 /* Function that physically creates map in the game */
 static void create_map();
 
@@ -180,7 +187,7 @@ static void set_player_starting_position(int i, int j);
 /* Handles player movement */
 static void player_movement();
 
-/* Support function that sets diffuse coeffs in a global vector */
+/* Support function that sets diffuse coeffs in a global vector and calls glMaterialfv */
 static void set_diffuse(float r, float g, float b, float a);
 
 /* Support function that draws coordinate system */
@@ -206,7 +213,7 @@ static bool check_key_inventory(int i, int j);
 /* If door has moved beyond minimal point, it's no longer rendered on the map */
 static bool check_door_moved(int i, int j);
 
-/* Support function that checks the player position */
+/* Support function that checks the player height position */
 static bool check_height(float min_height, float max_height); 
 
 /* Creates key of fixed size */
@@ -293,6 +300,7 @@ int main(int argc, char** argv)
     store_map_data();
     store_map_connections();
 
+    /* Activating global timer and teleport animation */
     glutTimerFunc(TIMER_INTERVAL, on_timer, GLOBAL_TIMER_ID);
     glutTimerFunc(TIMER_INTERVAL, on_timer, TELEPORT_TIMER_ID);
 
@@ -302,6 +310,7 @@ int main(int argc, char** argv)
     /* Freeing dynamicly allocated space for map */
     map = free_map(map);
 
+    /* Finishing program */
     return 0;
 }
 
@@ -310,7 +319,9 @@ static void on_keyboard(unsigned char key, int x, int y)
     if (key == EXIT_KEY) {
         /* Exiting program */
         exit(EXIT_SUCCESS);
-    } else if (key == '1') {
+    } 
+    /* Cases '1' - '8' are optional, used for hack-collecting :) */
+    else if (key == '1') {
         has_switch_98 = true;
         glutPostRedisplay();
     } else if (key == '2') {
@@ -392,8 +403,10 @@ static void on_keyboard(unsigned char key, int x, int y)
 static void on_keyboard_release(unsigned char key, int x, int y)
 {
     if (key == 'w' || key == 's') {
+        /* Stopping forward/backward movement */
         v_forward = 0;
     } else if (key == 'a' || key == 'd') {
+        /* Stopping left/right movement */
         v_right = 0;
     }
 }
@@ -416,6 +429,7 @@ static void on_mouse_passive(int x, int y)
     last_x = x;
     last_y = y;
 
+    /* Rescaling offsets to minimize camera rotations */
     float sensitivity = 0.5f;
     x_offset *= sensitivity;
     y_offset *= sensitivity;
@@ -438,6 +452,7 @@ static void on_mouse_passive(int x, int y)
     float front_y = sin(theta * DEG_TO_RAD);
     float front_z = sin(phi * DEG_TO_RAD) * cos(theta * DEG_TO_RAD);
 
+    /* Setting up front vector */
     glm_vec3((vec3){front_x, front_y, front_z}, front);
     glm_normalize(front);
 
@@ -446,10 +461,12 @@ static void on_mouse_passive(int x, int y)
 
 static void on_timer(int value)
 {
+    /* Activating timer based on timer id */
     if (value == GLOBAL_TIMER_ID) {
 
         global_time_parameter += 1;
 
+        /* Since global tiemr is always active, player movement is handled here */
         player_movement();
 
         glutPostRedisplay();
@@ -576,7 +593,7 @@ static void glut_initialize()
     glClearColor(0.7, 0.7, 0.7, 0);
     glEnable(GL_DEPTH_TEST);
 
-    /* Normal vector intesities set to 1 */
+    /* Normal object vector intesities set to 1 */
     glEnable(GL_NORMALIZE);
 
     /* Removes cursor visibility */
@@ -618,6 +635,7 @@ static void set_player_starting_position(int i, int j)
 
 static void player_movement()
 {
+    /* Checking global movement indicators */
     if (v_forward != 0) {
         glm_vec3_muladds(camera_front, v_forward * camera_speed, camera_pos);
     }
@@ -636,10 +654,12 @@ static FieldData** allocate_map()
     FieldData** m = NULL;
     int i;
 
+    /* Allocating row space */
     m = (FieldData**)malloc(map_rows * sizeof(FieldData*));
     osAssert(m != NULL, "Allocating memory for map matrix rows failed\n");
 
     for(i = 0; i < map_rows; i++) {
+        /* Allocating column space */
         m[i] = (FieldData*)malloc(map_cols * sizeof(FieldData));
         if (m[i] == NULL) {
             int j;
@@ -659,10 +679,14 @@ static FieldData** allocate_map()
 static FieldData** free_map()
 {
     int i;
+
+    /* Freeing column space */
     for(i = 0; i < map_rows; i++)
         free(map[i]);
 
+    /* Freeing row space */
     free(map);
+
     return NULL;
 }
 
@@ -671,6 +695,7 @@ static void store_map_data()
     FILE* f = NULL;
     int i, j;
 
+    /* Opening map file */
     f = fopen(map_input_file, "r");
     osAssert(f != NULL, "Error opening file \"map.txt\"\n");
 
@@ -693,11 +718,14 @@ static void store_map_connections()
     int n, row1, row2, col1, col2, i;
     char c;
 
+    /* Opening map connections file */
     f = fopen(map_connections_file, "r");
     osAssert(f != NULL, "Error opening file \"map_connections.txt\"\n");
 
     fscanf(f, "%d", &n);
-    fgetc(f);
+    fgetc(f); // collecting '\n'
+
+    /* Scanning data */
     for (i = 0; i < n; i++) {
         fscanf(f, "%c %d %d %d %d ", &c, &row1, &col1, &row2, &col2);
 
@@ -755,6 +783,7 @@ static void draw_cylinder(float r, float h)
 {
     float phi;
 
+    /* Drawing cylinder strip by strip */
     glBegin(GL_TRIANGLE_STRIP);
     for (phi = 0; phi <= 2*PI + EPS; phi += PI/20) {
         set_norm_vert_cylinder(r, phi, 0);
@@ -769,6 +798,8 @@ static void create_wall(float cube_size, int height)
 
     glPushMatrix();
         glTranslatef(0, -cube_size, 0);
+
+        /* Drawing wall cube by cube */
         for (i = 1; i <= height; i++) {
             glTranslatef(0, cube_size, 0);
             glutSolidCube(cube_size);
@@ -1121,10 +1152,12 @@ static void check_player_position()
     float min_height, max_height;
 
     tmp = map_rows + camera_pos[2] / CUBE_SIZE;
+
     /* Map matrix positions */
     i = tmp > 10 ? 10 : tmp; // Row 10 bug fix
     j = camera_pos[0] / CUBE_SIZE;
 
+    /* Setting up height interval used for proper height detection */
     min_height = (map[i][j].height - 1) * CUBE_SIZE + CUBE_SIZE / 3;
     max_height = map[i][j].height * CUBE_SIZE + CUBE_SIZE / 2;
 
@@ -1160,6 +1193,7 @@ static void check_player_position()
         }
     } else if (map[i][j].type == 'X' && check_height(min_height, max_height - CUBE_SIZE / 2) 
         && check_inside_circle(i, j)) {
+        /* Player has reached white teleport - he wins the game! */
         fprintf(stdout, "YOU WON !!!\n");
         exit(EXIT_SUCCESS);
     } else {
@@ -1194,10 +1228,12 @@ static void check_teleportation()
     float min_height, max_height;
 
     tmp = map_rows + camera_pos[2] / CUBE_SIZE;
+
     /* Map matrix positions */
     i = tmp > 10 ? 10 : tmp; // Row 10 bug fix
     j = camera_pos[0] / CUBE_SIZE;
 
+    /* Setting up height interval used for proper inside-teleport height detection */
     min_height = (map[i][j].height - 1) * CUBE_SIZE + CUBE_SIZE / 3;
     max_height = map[i][j].height * CUBE_SIZE;
 
