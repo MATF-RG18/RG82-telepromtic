@@ -908,8 +908,24 @@ static void create_teleport(float x, float y, float z, char color)
                     z + r_in * cos(angle_scale*phi));
         glEnd();        
     }
+    
+    /* Outer rotating lines */
+    glLineWidth(2.2);
+    glColor4fv(lines);
 
-    /* Outer rings */
+    glRotatef(-teleport_parameter * RAD_TO_DEG, 0, 1, 0);
+    for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
+        glBegin(GL_LINES);
+            glVertex3f(x  + r * sin(phi), 
+                    y, 
+                    z + r * cos(phi));
+            glVertex3f(x + r * sin(phi), 
+                    y + line_height, 
+                    z + r * cos(phi));
+        glEnd();        
+    }
+
+    /* Outer rings - version 2 teleport */
     /*
     glColor4fv(outer);
 
@@ -925,22 +941,6 @@ static void create_teleport(float x, float y, float z, char color)
         }
     glPopMatrix();
     */
-    
-   /* Outer rotating lines */
-    glLineWidth(2.2);
-    glColor4fv(lines);
-
-    glRotatef(-teleport_parameter * RAD_TO_DEG, 0, 1, 0);
-    for (phi = 0; phi <= 2*PI + EPS; phi += PI / 20) {
-        glBegin(GL_LINES);
-            glVertex3f(x  + r * sin(phi), 
-                    y, 
-                    z + r * cos(phi));
-            glVertex3f(x + r * sin(phi), 
-                    y + line_height, 
-                    z + r * cos(phi));
-        glEnd();        
-    }
 
     glEnable(GL_LIGHTING);
 }
